@@ -24,7 +24,7 @@ class MIMICDataset(PatientDataset):
                      'Anion gap', 'Potassium (serum)', 'HCO3 (serum)', 'Platelet Count', 'Prothrombin time', 'PTT',
                      'Lactic Acid', 'Age', 'gender', 'ethnicity', 'insurance']
     target_small = ["label"]
-    feature_small_cat = ['ethnicity', 'gender', 'ethnicity', 'insurance']
+    feature_small_cat = ['ethnicity', 'gender', 'insurance']
     feature_small_cont = feature_small[:15]
 
     def __init__(
