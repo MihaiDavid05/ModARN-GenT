@@ -450,7 +450,7 @@ class MoDNModelMIMICDecode(PatientModel):
                     logs[f"val_rmse_score_{d}"] = np.array(rmse).mean()
 
                 for d in self.feature_decoders_cat:
-                    f1s = [val_scores[stage][f"{d}_f1"] for stage in list(range(0, val_data.timestamps))]
+                    f1s = [val_scores[stage][f"{d}_f1"] for stage in list(range(0, val_data.timestamps - 1))]
                     logs[f"val_f1_score_{d}"] = np.array(f1s).mean()
 
                 macro_f1s_disease = [val_scores[stage]["macro_f1_targets"] for stage in
@@ -611,35 +611,30 @@ class MoDNModelMIMICDecode(PatientModel):
                 ) / len(test_set)
 
             for target in test_set.unique_features_cat:
-                choices = test_set.feature_info[('-1', target)].possible_values
-                assert choices is not None
-                metrics[stage][f"{target}_accuracy"] = sum(
-                    counts[stage, target, choice, "correct"] for choice in choices
-                ) / (len(test_set) - patients_with_missing_val[target])
+                if correct_predictions.get((stage, target), None):
+                    choices = test_set.feature_info[('-1', target)].possible_values
+                    assert choices is not None
+                    metrics[stage][f"{target}_accuracy"] = sum(
+                        counts[stage, target, choice, "correct"] for choice in choices
+                    ) / (len(test_set) - patients_with_missing_val[target])
 
             # F1
             for target in test_set.unique_targets + test_set.unique_features_cat:
-                choices = test_set.feature_info[('-1', target)].possible_values
-                assert choices is not None
-                for choice in choices:
+                if correct_predictions.get((stage, target), None):
+                    choices = test_set.feature_info[('-1', target)].possible_values
                     assert choices is not None
-                    if counts[stage, target, choice, "correct"] == 0:
-                        metrics[stage][f"{target}_{choice}_f1"] = 0
-                    else:
-                        metrics[stage][f"{target}_{choice}_f1"] = counts[
-                                                                      stage, target, choice, "correct"
-                                                                  ] / (
-                                                                          counts[stage, target, choice, "correct"]
-                                                                          + 0.5
-                                                                          * sum(
-                                                                      counts[stage, target, choice, "wrong"] for choice
-                                                                      in choices
-                                                                  )
-                                                                  )
+                    for choice in choices:
+                        assert choices is not None
+                        if counts[stage, target, choice, "correct"] == 0:
+                            metrics[stage][f"{target}_{choice}_f1"] = 0
+                        else:
+                            metrics[stage][f"{target}_{choice}_f1"] = counts[stage, target, choice, "correct"] / (
+                                        counts[stage, target, choice, "correct"] + 0.5 * sum(
+                                            counts[stage, target, choice, "wrong"] for choice in choices))
 
-                metrics[stage][f"{target}_f1"] = sum(
-                    metrics[stage][f"{target}_{choice}_f1"] for choice in choices
-                ) / len(choices)
+                    metrics[stage][f"{target}_f1"] = sum(
+                        metrics[stage][f"{target}_{choice}_f1"] for choice in choices
+                    ) / len(choices)
 
             metrics[stage][f"accuracy_targets"] = sum(
                 correct_predictions[stage, target] for target in test_set.unique_targets
@@ -649,7 +644,8 @@ class MoDNModelMIMICDecode(PatientModel):
                 metrics[stage][f"{target}_f1"] for target in test_set.unique_targets
             ) / len(test_set.unique_targets)
 
-            if stage != -1:
+            # TODO: Check this overall metrics
+            if stage not in [stages[0], stages[-1]]:
                 metrics[stage][f"accuracy_targets_cat"] = sum(
                     correct_predictions[stage, target] for target in test_set.unique_features_cat
                 ) / (len(test_set) * len(test_set.unique_features_cat) - sum(patients_with_missing_val.values()))
@@ -658,10 +654,9 @@ class MoDNModelMIMICDecode(PatientModel):
                     metrics[stage][f"{target}_f1"] for target in test_set.unique_features_cat
                 ) / len(test_set.unique_features_cat)
 
-            # TODO: RMSE
-            # metrics[stage]['rmse'] = sum(
-            #     metrics[stage].get([f"{target}_rmse"], 0) for target in test_set.unique_features_cont
-            # )
+                # metrics[stage]['rmse'] = sum(
+                #     metrics[stage].get([f"{target}_rmse"], 0) for target in test_set.unique_features_cont
+                # )
 
         return metrics
 
