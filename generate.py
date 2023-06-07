@@ -2,12 +2,9 @@ import os
 import torch
 import argparse
 from modn_data import DATA_ABS_PATH
-from modn.scripts.generation_utils import generate_dataset
 from modn.datasets.mimic import MIMICDataset
 from modn.models.modn import MoDNModelMIMIC
 from modn.models.modn_decode import MoDNModelMIMICDecode
-
-MODEL_NAME = 'Exp_10_MaxEpochs_650_toy_feat_decode_model_best_loss.pt'
 
 
 def get_cli_args(parser):
@@ -47,7 +44,7 @@ def main():
     m.load_model(model_path)
 
     # Generate dataset
-    generate_dataset(m)
+    m.generate()
 
 
 if __name__ == "__main__":

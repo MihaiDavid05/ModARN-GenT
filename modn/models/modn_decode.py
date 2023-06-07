@@ -518,6 +518,9 @@ class MoDNModelMIMICDecode(PatientModel):
                 save_path = os.path.join('saved_models', saved_model_name + str(epoch + 1) + '_best.pt')
                 self.save_and_store(wandb_log, save_path)
 
+    def generate(self):
+        pass
+
     def save_and_store(self, wandb_log, model_name):
         # if wandb_log:
         #     wandb.log_artifact(model_name, name=model_name, type="model")
@@ -644,16 +647,23 @@ class MoDNModelMIMICDecode(PatientModel):
                 metrics[stage][f"{target}_f1"] for target in test_set.unique_targets
             ) / len(test_set.unique_targets)
 
-            # TODO: Check this overall metrics
             if stage not in [stages[0], stages[-1]]:
                 metrics[stage][f"accuracy_targets_cat"] = sum(
                     correct_predictions[stage, target] for target in test_set.unique_features_cat
                 ) / (len(test_set) * len(test_set.unique_features_cat) - sum(patients_with_missing_val.values()))
 
-                metrics[stage][f"macro_f1_targets_cat"] = sum(
-                    metrics[stage][f"{target}_f1"] for target in test_set.unique_features_cat
-                ) / len(test_set.unique_features_cat)
+                # metrics[stage][f"macro_f1_targets_cat"] = sum(
+                #     metrics[stage][f"{target}_f1"] for target in test_set.unique_features_cat
+                # ) / len(test_set.unique_features_cat)
 
+                nr_feats_stage, sum_feats = 0, 0
+                for target in test_set.unique_features_cat:
+                    if metrics[stage].get([f"{target}_f1"], None):
+                        nr_feats_stage += 1
+                        sum_feats += metrics[stage][f"{target}_f1"]
+                metrics[stage][f"macro_f1_targets_cat"] = sum_feats / nr_feats_stage
+
+                # TODO: Check this overall rmse
                 # metrics[stage]['rmse'] = sum(
                 #     metrics[stage].get([f"{target}_rmse"], 0) for target in test_set.unique_features_cont
                 # )
