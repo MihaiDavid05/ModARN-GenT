@@ -44,7 +44,7 @@ def main():
     m.load_model(model_path)
 
     # Generate dataset
-    m.generate()
+    m.generate(test)
 
 
 if __name__ == "__main__":

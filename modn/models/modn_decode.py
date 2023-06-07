@@ -518,8 +518,36 @@ class MoDNModelMIMICDecode(PatientModel):
                 save_path = os.path.join('saved_models', saved_model_name + str(epoch + 1) + '_best.pt')
                 self.save_and_store(wandb_log, save_path)
 
-    def generate(self):
-        pass
+    def generate(self, data):
+        default_info = [('gender', 'M')]
+        timesteps = 10
+        results = {}
+
+        with torch.no_grad():
+            # Initialize state for a patient
+            state = self.init_state(1)
+
+            # Encode with existing information
+            for info in default_info:
+
+                state = self.encoders[info[0]](state, info[1])
+
+            for t in range(0, timesteps):
+                for target_name in data.unique_features_cont:
+                    results[(t, target_name)] = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0][0]
+                for target_name in data.unique_features_cat:
+                    results[(t, target_name)] = np.argmax(self.feature_decoders_cat[target_name](state).softmax(1).detach().numpy()[0])
+                print("OK")
+
+
+
+
+
+            # for idx1, (target_name, target) in enumerate(targets.items()):
+            #     enc_dict = self.feature_info[target_name].encoding_dict
+            #     target = enc_dict[target].view(1)
+            #     logits1 = self.decoders[target_name](state)
+
 
     def save_and_store(self, wandb_log, model_name):
         # if wandb_log:
@@ -652,10 +680,6 @@ class MoDNModelMIMICDecode(PatientModel):
                     correct_predictions[stage, target] for target in test_set.unique_features_cat
                 ) / (len(test_set) * len(test_set.unique_features_cat) - sum(patients_with_missing_val.values()))
 
-                # metrics[stage][f"macro_f1_targets_cat"] = sum(
-                #     metrics[stage][f"{target}_f1"] for target in test_set.unique_features_cat
-                # ) / len(test_set.unique_features_cat)
-
                 nr_feats_stage, sum_feats = 0, 0
                 for target in test_set.unique_features_cat:
                     if metrics[stage].get(f"{target}_f1", None):
@@ -663,10 +687,12 @@ class MoDNModelMIMICDecode(PatientModel):
                         sum_feats += metrics[stage][f"{target}_f1"]
                 metrics[stage][f"macro_f1_targets_cat"] = sum_feats / nr_feats_stage
 
-                # TODO: Check this overall rmse
-                # metrics[stage]['rmse'] = sum(
-                #     metrics[stage].get([f"{target}_rmse"], 0) for target in test_set.unique_features_cont
-                # )
+                nr_feats_stage, sum_feats = 0, 0
+                for target in test_set.unique_features_cont:
+                    if metrics[stage].get(f"{target}_rmse", None):
+                        nr_feats_stage += 1
+                        sum_feats += metrics[stage][f"{target}_rmse"]
+                metrics[stage][f"rmse_targets_cont"] = sum_feats / nr_feats_stage
 
         return metrics
 

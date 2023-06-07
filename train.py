@@ -50,10 +50,10 @@ def main():
     test = val
 
     if feature_decoding:
-        lr_feature_decoders = {
-            feature_name: 1e-2 for feature_name in data.unique_features_cat
-        }
         if dataset_type == 'toy':
+            lr_feature_decoders = {
+                feature_name: 1e-2 for feature_name in data.unique_features_cat
+            }
             lr_feature_decoders.update({
                 'F1_constant': 6e-5,
                 'F2_early': 1e-4,
@@ -68,22 +68,25 @@ def main():
             nr_epochs = 800
 
         else:
+            lr_feature_decoders = {
+                feature_name: 1e-2 for feature_name in data.unique_features_cat
+            }
             lr_feature_decoders.update({
-                'WBC': 1e-8,
-                'Chloride (serum)': 1e-7,
-                'Glucose (serum)': 5e-8,
-                'Magnesium': 1e-8,
-                'Sodium (serum)': 1e-6,
-                'BUN': 1e-7,
-                'Phosphorous': 1e-7,
-                'Anion gap': 1e-7,
-                'Potassium (serum)': 1e-7,
-                'HCO3 (serum)': 1e-7,
-                'Platelet Count': 1e-7,
-                'Prothrombin time': 1e-7,
-                'PTT': 5e-8,
-                'Lactic Acid': 1e-7,
-                'Age': 1e-7
+                'WBC': 1e-9,
+                'Chloride (serum)': 1e-9,
+                'Glucose (serum)': 1e-9,
+                'Magnesium': 1e-9,
+                'Sodium (serum)': 1e-9,
+                'BUN': 1e-9,
+                'Phosphorous': 1e-9,
+                'Anion gap': 1e-9,
+                'Potassium (serum)': 1e-9,
+                'HCO3 (serum)': 1e-9,
+                'Platelet Count': 1e-9,
+                'Prothrombin time': 1e-9,
+                'PTT': 1e-9,
+                'Lactic Acid': 1e-9,
+                'Age': 1e-9
             })
             lr_encoders_val = 1e-2
             step_size_val = 200
