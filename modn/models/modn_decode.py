@@ -658,7 +658,7 @@ class MoDNModelMIMICDecode(PatientModel):
 
                 nr_feats_stage, sum_feats = 0, 0
                 for target in test_set.unique_features_cat:
-                    if metrics[stage].get([f"{target}_f1"], None):
+                    if metrics[stage].get(f"{target}_f1", None):
                         nr_feats_stage += 1
                         sum_feats += metrics[stage][f"{target}_f1"]
                 metrics[stage][f"macro_f1_targets_cat"] = sum_feats / nr_feats_stage

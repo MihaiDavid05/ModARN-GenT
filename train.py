@@ -85,10 +85,10 @@ def main():
                 'Lactic Acid': 1e-7,
                 'Age': 1e-7
             })
-            lr_encoders_val = 1e-3
-            step_size_val = 150
+            lr_encoders_val = 1e-2
+            step_size_val = 200
             learning_rate_decay_factor = 0.9
-            nr_epochs = 250
+            nr_epochs = 500
 
         lr_encoders = {feature_name: lr_encoders_val for feature_name in data.unique_features}
 
