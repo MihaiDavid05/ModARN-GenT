@@ -13,10 +13,10 @@ from modn.models.modn import MoDNModelMIMIC
 
 PROJECT_NAME = "modn-on-mimic"
 DATASET_TYPE = "toy"
-EXP_ID = 10
+EXP_ID = 0
 
 FEATURE_DECODING = True
-WANDB_LOG = False
+WANDB_LOG = True
 
 PER_PATIENT = False
 EARLY_STOPPING = True
@@ -49,9 +49,9 @@ def main():
                 'Age': 8e-5,
             })
             lr_encoders_val = 1e-2
-            step_size_val = 150
+            step_size_val = 300
             learning_rate_decay_factor = 0.9
-            nr_epochs = 650
+            nr_epochs = 800
 
         else:
             lr_feature_decoders.update({

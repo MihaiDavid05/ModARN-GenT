@@ -16,7 +16,7 @@ class MIMICDataset(PatientDataset):
     # Define small dataset features
     feature_toy = ['F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide', 'Age', 'gender', 'insurance']
     target_toy = ["label"]
-    feature_toy_cont = ['Age', 'F1_constant']#, 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide']
+    feature_toy_cont = ['Age', 'F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide']
     feature_toy_cat = ['gender', 'insurance']
 
     # Define toy dataset features
