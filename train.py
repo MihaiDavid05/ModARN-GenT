@@ -3,43 +3,57 @@ import os
 import seaborn as sns
 import torch
 from modn_data import DATA_ABS_PATH
-
+import argparse
 import wandb
 from modn.datasets.mimic import MIMICDataset
 from modn.models.modn import MoDNMIMICHyperparameters
 from modn.models.modn_decode import MoDNModelMIMICDecode, MoDNMIMICHyperparametersDecode
 from modn.models.modn import MoDNModelMIMIC
 
-
+# Project name for wandb
 PROJECT_NAME = "modn-on-mimic"
-DATASET_TYPE = "toy"
-EXP_ID = 0
 
-FEATURE_DECODING = True
-WANDB_LOG = True
 
-PER_PATIENT = False
-EARLY_STOPPING = True
-RESET_STATE = False
+def get_cli_args(parser):
+    parser.add_argument('--dataset_type', type=str, required=True, help='Dataset type: small or toy')
+    parser.add_argument('--exp_id', type=int, required=True, help='Experiment id (in case multiple configs)')
+    parser.add_argument('--feature_decoding', action='store_true', help='Whether to use feature decoding or not')
+    parser.add_argument('--reset_state', action='store_true',
+                        help='Whether to reset state at each timestep at validation time')
+    parser.add_argument('--wandb_log', action='store_true', help='Log results in wandb or not')
+    parser.add_argument('--early_stopping', action='store_true', help='Use early stopping or not')
+
+    return parser.parse_args()
 
 
 def main():
     sns.set_style("whitegrid")
 
+    args = get_cli_args(argparse.ArgumentParser())
+    dataset_type = args.dataset_type
+    exp_id = args.exp_id
+    feature_decoding = args.feature_decoding
+    reset_state = args.reset_state
+    wandb_log = args.wandb_log
+    early_stopping = args.early_stopping
+
+    # Note: Deprecated parameter in case using modn_slow.py script. Leave this as False.
+    per_patient = False
+
     # Initialize dataset
-    data = MIMICDataset(os.path.join(DATA_ABS_PATH, "MIMIC_data_labels_{}.csv".format(DATASET_TYPE)),
-                        data_type=DATASET_TYPE, global_question_block=False,
-                        remove_correlated_features=not FEATURE_DECODING, use_feats_decoders=FEATURE_DECODING)
+    data = MIMICDataset(os.path.join(DATA_ABS_PATH, "MIMIC_data_labels_{}.csv".format(dataset_type)),
+                        data_type=dataset_type, global_question_block=False,
+                        remove_correlated_features=not feature_decoding, use_feats_decoders=feature_decoding)
 
     # Define train/val/test splits
     train, val = data.random_split([0.8, 0.2], generator=torch.Generator().manual_seed(0))
     test = val
 
-    if FEATURE_DECODING:
+    if feature_decoding:
         lr_feature_decoders = {
             feature_name: 1e-2 for feature_name in data.unique_features_cat
         }
-        if DATASET_TYPE == 'toy':
+        if dataset_type == 'toy':
             lr_feature_decoders.update({
                 'F1_constant': 6e-5,
                 'F2_early': 1e-4,
@@ -78,8 +92,8 @@ def main():
 
         lr_encoders = {feature_name: lr_encoders_val for feature_name in data.unique_features}
 
-        model_name = "Exp_{}_MaxEpochs_{}_{}{}".format(EXP_ID, nr_epochs, DATASET_TYPE,
-                                                       '_feat_decode' if FEATURE_DECODING else '')
+        model_name = "Exp_{}_MaxEpochs_{}_{}{}".format(exp_id, nr_epochs, dataset_type,
+                                                       '_feat_decode' if feature_decoding else '')
 
         # Define MoDN hyper parameters
         hyper_parameters = MoDNMIMICHyperparametersDecode(
@@ -102,7 +116,7 @@ def main():
             patience=50
         )
         # Define model
-        model = MoDNModelMIMICDecode(RESET_STATE, parameters=hyper_parameters)
+        model = MoDNModelMIMICDecode(reset_state, parameters=hyper_parameters)
     else:
         negative_slope = 25
         add_state = True
@@ -116,9 +130,9 @@ def main():
         patience = 30
         learning_rate_decay_factor = 0.9
 
-        model_name = "Exp_{}_MaxEpochs_{}_{}{}{}".format(EXP_ID, nr_epochs, DATASET_TYPE,
-                                                         'feat_decode' if FEATURE_DECODING else '',
-                                                         '_per_patient' if PER_PATIENT else '')
+        model_name = "Exp_{}_MaxEpochs_{}_{}{}{}".format(exp_id, nr_epochs, dataset_type,
+                                                         'feat_decode' if feature_decoding else '',
+                                                         '_per_patient' if per_patient else '')
         # Define MoDN hyper parameters
         hyper_parameters = MoDNMIMICHyperparameters(
             num_epochs=nr_epochs,
@@ -138,15 +152,15 @@ def main():
             patience=patience
         )
         # Define model
-        model = MoDNModelMIMIC(RESET_STATE, parameters=hyper_parameters)
+        model = MoDNModelMIMIC(reset_state, parameters=hyper_parameters)
 
-    if WANDB_LOG:
+    if wandb_log:
         wandb.init(project=PROJECT_NAME, name=model_name, config=hyper_parameters._asdict())
 
     # Fit model
     saved_model_name = f"{model_name}_model"
 
-    model.fit(train, val, test, early_stopping=EARLY_STOPPING, wandb_log=WANDB_LOG, saved_model_name=saved_model_name)
+    model.fit(train, val, test, early_stopping=early_stopping, wandb_log=wandb_log, saved_model_name=saved_model_name)
 
 
 if __name__ == "__main__":

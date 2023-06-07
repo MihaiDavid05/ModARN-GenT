@@ -84,7 +84,7 @@ class MoDNMIMICHyperparametersDecode(NamedTuple):
 class MoDNModelMIMICDecode(PatientModel):
     """The Modular Decision support Networks model"""
 
-    def __init__(self, reset_state: bool, parameters: Optional[MoDNMIMICHyperparametersDecode] = None):
+    def __init__(self, reset_state: bool = False, parameters: Optional[MoDNMIMICHyperparametersDecode] = None):
 
         self.reset_state_eval = reset_state
         self.hyper_parameters = parameters
