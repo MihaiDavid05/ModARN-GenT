@@ -28,8 +28,8 @@ def main():
     patient = test[patient_id]
 
     # Print its consultation results
-    for q in patient.consultation.observations(shuffle_within_blocks=True):
-        print(q.question, q.answer)
+    for q in patient.consultation.observations(shuffle_within_blocks=False):
+        print(q[0])
 
 
 if __name__ == "__main__":

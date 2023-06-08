@@ -9,6 +9,7 @@ from modn.models.modn_decode import MoDNModelMIMICDecode
 
 def get_cli_args(parser):
     parser.add_argument('--model_file', type=str, required=True, help='Checkpoint you want to use for generation')
+    parser.add_argument('--output_path', type=str, required=True, help='Output path for the generated dataframe')
 
     return parser.parse_args()
 
@@ -17,6 +18,7 @@ def main():
 
     args = get_cli_args(argparse.ArgumentParser())
     model_name = args.model_file
+    output_path = args.output_path
 
     model_path = os.path.join('saved_models', model_name)
 
@@ -44,7 +46,10 @@ def main():
     m.load_model(model_path)
 
     # Generate dataset
-    m.generate(test)
+    df = m.generate(test)
+
+    # Save dataframe
+    df.to_csv(output_path, index=False)
 
 
 if __name__ == "__main__":

@@ -11,8 +11,9 @@ import torch.nn as nn
 import wandb
 from torch.optim.lr_scheduler import StepLR
 from tqdm.auto import tqdm
+from collections import namedtuple
 
-from modn.datasets import ConsultationMIMIC, PatientDataset
+from modn.datasets import ConsultationMIMIC, PatientDataset, ObservationMIMIC, ObservationBlockMIMIC, DataPointMIMIC
 from modn.models import FeatureNameMIMIC, PatientModel, Prediction
 from modn.models.modules import EpoctBinaryDecoder, EpoctEncoder, InitState, EpoctCategoricalDecoder
 from modn.models.modules import EpoctDistributionDecoder
@@ -519,35 +520,105 @@ class MoDNModelMIMICDecode(PatientModel):
                 self.save_and_store(wandb_log, save_path)
 
     def generate(self, data):
-        default_info = [('gender', 'M')]
+        # TODO: here
         timesteps = 10
-        results = {}
+        df = data._data.data[0:0]
+        default_info = [('gender', 'M'), ('gender', 'F')]
 
-        with torch.no_grad():
-            # Initialize state for a patient
-            state = self.init_state(1)
+        for i in range(len(default_info)):
 
-            # Encode with existing information
-            for info in default_info:
+            results = {}
+            static_agg = {}
+            info = default_info[i]
 
-                state = self.encoders[info[0]](state, info[1])
+            with torch.no_grad():
+                # Initialize state for a patient
+                state = self.init_state(1)
 
-            for t in range(0, timesteps):
+                # Encode with existing information
+                enc_dict = self.feature_info[('-1', info[0])].encoding_dict
+                info_value = enc_dict[info[1]].view(1)
+                state = self.encoders[info[0]](state, info_value)
+
+                # Decode for first timestep
                 for target_name in data.unique_features_cont:
-                    results[(t, target_name)] = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0][0]
+                    res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0][0]
+                    results[('0', target_name)] = res
+                    if target_name == 'Age':
+                        if not static_agg.get(target_name, None):
+                            static_agg[target_name] = [res]
+                        else:
+                            static_agg[target_name].append(res)
+
+                for target_name in data.target_features:
+                    res = np.argmax(self.decoders[target_name](state).softmax(1))
+                    enc_dict = self.feature_info[target_name].encoding_dict
+                    res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
+                    unique_key = target_name[1]
+                    results[('0', unique_key)] = res
+                    if not static_agg.get(unique_key, None):
+                        static_agg[unique_key] = [res]
+                    else:
+                        static_agg[unique_key].append(res)
+
                 for target_name in data.unique_features_cat:
-                    results[(t, target_name)] = np.argmax(self.feature_decoders_cat[target_name](state).softmax(1).detach().numpy()[0])
-                print("OK")
+                    res = np.argmax(self.feature_decoders_cat[target_name](state).softmax(1))
+                    enc_dict = self.feature_info[('-1', target_name)].encoding_dict
+                    res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
+                    results[('0', target_name)] = res
+                    if not static_agg.get(target_name, None):
+                        static_agg[target_name] = [res]
+                    else:
+                        static_agg[target_name].append(res)
 
+                for t in range(1, timesteps):
+                    # Encode
+                    for target_name in data.unique_features_cont + data.unique_features_cat:
+                        state = self.encoders[target_name](state, results[(str(t - 1), target_name)])
 
+                    # Decode
+                    for target_name in data.unique_features_cont:
+                        res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0][0]
+                        results[(str(t), target_name)] = res
+                        if target_name == 'Age':
+                            if not static_agg.get(target_name, None):
+                                static_agg[target_name] = [res]
+                            else:
+                                static_agg[target_name].append(res)
 
+                    for target_name in data.unique_features_cat:
+                        res = np.argmax(self.feature_decoders_cat[target_name](state).softmax(1))
+                        enc_dict = self.feature_info[('-1', target_name)].encoding_dict
+                        res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
+                        results[(str(t), target_name)] = res
+                        if not static_agg.get(target_name, None):
+                            static_agg[target_name] = [res]
+                        else:
+                            static_agg[target_name].append(res)
 
+                    for target_name in data.target_features:
+                        res = np.argmax(self.decoders[target_name](state).softmax(1).detach().numpy()[0])
+                        unique_key = target_name[1]
+                        results[(str(t), unique_key)] = res
+                        if not static_agg.get(unique_key, None):
+                            static_agg[unique_key] = [res]
+                        else:
+                            static_agg[unique_key].append(res)
 
-            # for idx1, (target_name, target) in enumerate(targets.items()):
-            #     enc_dict = self.feature_info[target_name].encoding_dict
-            #     target = enc_dict[target].view(1)
-            #     logits1 = self.decoders[target_name](state)
+            # Aggregate static variables
+            for key, val in static_agg.items():
+                if key == 'Age':
+                    results[('-1', key)] = np.mean(val)
+                else:
+                    results[('-1', key)] = max(set(val), key=val.count)
 
+            # Build dataframe
+            row = []
+            for col in df.columns:
+                row.append(results[col])
+            df.loc[i] = row
+
+        return df
 
     def save_and_store(self, wandb_log, model_name):
         # if wandb_log:

@@ -244,9 +244,9 @@ class MIMICDataset(PatientDataset):
                     possible_values=list(data[feature].cat.categories),
                     mean_std_values=None,
                     encoding_dict={
-                        val: torch.tensor(idx)
-                        for idx, val in enumerate(list(data[feature].cat.categories))
+                        val: torch.tensor(idx) for idx, val in enumerate(list(data[feature].cat.categories))
                     },
+                    # TODO: Add reverse dict
                     nice_name=nice_name,
                 )
             else:
