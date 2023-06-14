@@ -10,6 +10,7 @@ from modn.models.modn_decode import MoDNModelMIMICDecode
 def get_cli_args(parser):
     parser.add_argument('--model_file', type=str, required=True, help='Checkpoint you want to use for generation')
     parser.add_argument('--output_path', type=str, required=True, help='Output path for the generated dataframe')
+    parser.add_argument('--generate', action='store_true', help='Generate data if True, else just compare predictions')
 
     return parser.parse_args()
 
@@ -19,6 +20,7 @@ def main():
     args = get_cli_args(argparse.ArgumentParser())
     model_name = args.model_file
     output_path = args.output_path
+    generate = args.generate
 
     model_path = os.path.join('saved_models', model_name)
 
@@ -45,8 +47,11 @@ def main():
     # Load model
     m.load_model(model_path)
 
-    # Generate dataset
-    df = m.generate(test)
+    if generate:
+        df = m.generate(test)
+    else:
+        df, gt_df = m.compare(test)
+        gt_df.to_csv('GT_test_data.csv', index=False)
 
     # Save dataframe
     df.to_csv(output_path, index=False)

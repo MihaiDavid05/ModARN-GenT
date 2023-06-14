@@ -20,8 +20,7 @@ Stage = float
 
 
 class EarlyStopper:
-    def __init__(self, model, wandb_log, min_delta=0):
-        self.min_delta = min_delta
+    def __init__(self, model, wandb_log):
         self.counter_f1 = 0
         self.counter_loss = 0
         self.min_validation_loss = np.inf
@@ -35,7 +34,7 @@ class EarlyStopper:
             self.counter_loss = 0
             print("Lower loss detected. Saving model.")
             self.model.save_and_store(self.wandb_log, model_name)
-        elif validation_loss > (self.min_validation_loss + self.min_delta):
+        elif validation_loss > self.min_validation_loss:
             self.counter_loss += 1
             print("Higher loss detected. Counter {}".format(self.counter_loss))
             if self.counter_loss >= patience:
@@ -49,7 +48,7 @@ class EarlyStopper:
             self.counter_f1 = 0
             print("Higher f1 score detected. Saving model.")
             self.model.save_and_store(self.wandb_log, model_name)
-        elif val_f1_score < (self.max_f1_score - self.min_delta):
+        elif val_f1_score < self.max_f1_score:
             self.counter_f1 += 1
             print("Lower f1 score detected. Counter {}".format(self.counter_loss))
             if self.counter_f1 >= patience:
@@ -196,7 +195,7 @@ class MoDNModelMIMIC(PatientModel):
             saved_model_name: str = "modn_plus_model",
             pretrained: bool = False
     ):
-        early_stopper = EarlyStopper(self, wandb_log, self.patience)
+        early_stopper = EarlyStopper(self, wandb_log)
 
         unique_features = train_data.unique_features
         nr_unique_features = len(unique_features)

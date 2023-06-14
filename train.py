@@ -16,7 +16,7 @@ PROJECT_NAME = "modn-on-mimic"
 
 def get_cli_args(parser):
     parser.add_argument('--dataset_type', type=str, required=True, help='Dataset type: small or toy')
-    parser.add_argument('--exp_id', type=int, required=True, help='Experiment id (in case multiple configs)')
+    parser.add_argument('--exp_id', type=str, required=True, help='Experiment id (in case multiple configs)')
     parser.add_argument('--feature_decoding', action='store_true', help='Whether to use feature decoding or not')
     parser.add_argument('--reset_state', action='store_true',
                         help='Whether to reset state at each timestep at validation time')
@@ -116,7 +116,7 @@ def main():
             shuffle_within_blocks=True,
             add_state=True,
             negative_slope=55,
-            patience=50
+            patience=20
         )
         # Define model
         model = MoDNModelMIMICDecode(reset_state, parameters=hyper_parameters)

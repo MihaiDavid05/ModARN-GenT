@@ -14,15 +14,24 @@ from modn.datasets import DataPointMIMIC, ConsultationMIMIC, ObservationMIMIC, F
 class MIMICDataset(PatientDataset):
 
     # Define small dataset features
+    feature_toy_static = ['Age', 'gender', 'insurance']
     feature_toy = ['F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide', 'Age', 'gender', 'insurance']
     target_toy = ["label"]
-    feature_toy_cont = ['Age', 'F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide']
+    # feature_toy_cont = ['Age', 'F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide']
+    feature_toy_cont = ['F1_constant']
     feature_toy_cat = ['gender', 'insurance']
+
+    # feature_toy = ['F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide', 'Age', 'gender', 'insurance', 'label']
+    # feature_toy_static = ['Age', 'gender', 'insurance', 'label']
+    # target_toy = ["label"]
+    # feature_toy_cont = ['Age', 'F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide']
+    # feature_toy_cat = ['gender', 'insurance', 'label']
 
     # Define toy dataset features
     feature_small = ['WBC', 'Chloride (serum)', 'Glucose (serum)', 'Magnesium', 'Sodium (serum)', 'BUN', 'Phosphorous',
                      'Anion gap', 'Potassium (serum)', 'HCO3 (serum)', 'Platelet Count', 'Prothrombin time', 'PTT',
                      'Lactic Acid', 'Age', 'gender', 'ethnicity', 'insurance']
+    feature_small_static = ['Age', 'gender', 'ethnicity', 'insurance']
     target_small = ["label"]
     feature_small_cat = ['ethnicity', 'gender', 'insurance']
     feature_small_cont = feature_small[:15]
@@ -38,11 +47,11 @@ class MIMICDataset(PatientDataset):
     ):
         self.global_question_block = global_question_block
         self.data = self._load_data(csv_file)
+        self.data_type = data_type
         self._metadata = None
         self.use_feats_decoders = use_feats_decoders
-        self.data_type = data_type
         self.timestamps = len(self.data.columns.levels[0]) - 1
-        self.nr_static_feats = 3 if self.data_type == 'toy' else 4
+        self.nr_static_feats = len(getattr(self, 'feature_{}_static'.format(self.data_type)))
         self.normalise = normalise
 
         if self.use_feats_decoders:
@@ -246,7 +255,6 @@ class MIMICDataset(PatientDataset):
                     encoding_dict={
                         val: torch.tensor(idx) for idx, val in enumerate(list(data[feature].cat.categories))
                     },
-                    # TODO: Add reverse dict
                     nice_name=nice_name,
                 )
             else:

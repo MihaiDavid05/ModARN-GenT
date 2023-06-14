@@ -11,9 +11,8 @@ import torch.nn as nn
 import wandb
 from torch.optim.lr_scheduler import StepLR
 from tqdm.auto import tqdm
-from collections import namedtuple
 
-from modn.datasets import ConsultationMIMIC, PatientDataset, ObservationMIMIC, ObservationBlockMIMIC, DataPointMIMIC
+from modn.datasets import ConsultationMIMIC, PatientDataset
 from modn.models import FeatureNameMIMIC, PatientModel, Prediction
 from modn.models.modules import EpoctBinaryDecoder, EpoctEncoder, InitState, EpoctCategoricalDecoder
 from modn.models.modules import EpoctDistributionDecoder
@@ -24,8 +23,7 @@ Stage = float
 
 
 class EarlyStopper:
-    def __init__(self, model, wandb_log, min_delta=0):
-        self.min_delta = min_delta
+    def __init__(self, model, wandb_log):
         self.counter_f1 = 0
         self.counter_loss = 0
         self.min_validation_loss = np.inf
@@ -39,7 +37,7 @@ class EarlyStopper:
             self.counter_loss = 0
             print("Lower loss detected. Saving model.")
             self.model.save_and_store(self.wandb_log, model_name)
-        elif validation_loss > (self.min_validation_loss + self.min_delta):
+        elif validation_loss > self.min_validation_loss:
             self.counter_loss += 1
             print("Higher loss detected. Counter {}".format(self.counter_loss))
             if self.counter_loss >= patience:
@@ -53,7 +51,7 @@ class EarlyStopper:
             self.counter_f1 = 0
             print("Higher f1 score detected. Saving model.")
             self.model.save_and_store(self.wandb_log, model_name)
-        elif val_f1_score < (self.max_f1_score - self.min_delta):
+        elif val_f1_score < self.max_f1_score:
             self.counter_f1 += 1
             print("Lower f1 score detected. Counter {}".format(self.counter_loss))
             if self.counter_f1 >= patience:
@@ -120,6 +118,49 @@ class MoDNModelMIMICDecode(PatientModel):
             self.patience,
         ) = hyper_parameters
 
+    def _compute_decoders_loss(self, target_obs, block_timesteps, block_per_consultation, targets_cont, state,
+                               aux_loss_cont_encoded, aux_loss_cat_encoded, decoder_loss_dict, targets_cat, criterion,
+                               nr_blocks_features_cont, nr_blocks_features_cat, init_state=False):
+        if len(target_obs) > 0:
+            add_cont_loss = False
+            add_cat_loss = False
+            for decoder_cont_question in self.feature_decoders_cont.keys():
+                target_val = None
+                for t in block_timesteps[block_per_consultation:]:
+                    if decoder_cont_question == 'Age':
+                        time = '-1'
+                    else:
+                        time = str(t)
+                    if not math.isnan(targets_cont[(time, decoder_cont_question)]):
+                        target_val = targets_cont[(time, decoder_cont_question)]
+                        break
+                if target_val:
+                    lss_cont = neg_log_likelihood_1d(torch.tensor(target_val).view(-1, 1),
+                                                     *self.feature_decoders_cont[decoder_cont_question](
+                                                         state))
+                    aux_loss_cont_encoded += lss_cont
+                    decoder_loss_dict[decoder_cont_question] += lss_cont
+                    add_cont_loss = True
+
+            for decoder_cat_question in self.feature_decoders_cat.keys():
+                target_val = targets_cat[('-1', decoder_cat_question)]
+                if isinstance(target_val, str):
+                    target_decoder_cat = self.feature_info[('-1', decoder_cat_question)].encoding_dict[
+                        target_val].view(1)
+                    lss_cat = criterion(self.feature_decoders_cat[decoder_cat_question](state),
+                                        target_decoder_cat)
+                    aux_loss_cat_encoded += lss_cat
+                    decoder_loss_dict[decoder_cat_question] += lss_cat
+                    add_cat_loss = True
+
+            if not init_state:
+                if add_cont_loss:
+                    nr_blocks_features_cont += 1
+                if add_cat_loss:
+                    nr_blocks_features_cat += 1
+
+        return aux_loss_cont_encoded, aux_loss_cat_encoded, decoder_loss_dict, nr_blocks_features_cont, nr_blocks_features_cat
+
     def _compute_loss(self, data: list, train: bool = True):
 
         if train:
@@ -174,17 +215,33 @@ class MoDNModelMIMICDecode(PatientModel):
 
             # Initialize state for 1 patient
             state = self.init_state(1)
+
+            # Get targets from timeblock 0
+            target_obs = consultation.get_decoders_targets(block_per_consultation,
+                                                           question_blocks=selected_question_blocks)
+
             # for t = 0, with just the initial state
             for idx1, (target_name, target) in enumerate(targets.items()):
                 enc_dict = self.feature_info[target_name].encoding_dict
                 target = enc_dict[target].view(1)
                 logits1 = self.decoders[target_name](state)
                 disease_loss += criterion(logits1, target)
+
+            aux_loss_cont_encoded, aux_loss_cat_encoded, \
+                decoder_loss_dict, nr_blocks_features_cont, \
+                nr_blocks_features_cat = self._compute_decoders_loss(target_obs, block_timesteps,
+                                                                     block_per_consultation, targets_cont,
+                                                                     state, aux_loss_cont_encoded,
+                                                                     aux_loss_cat_encoded, decoder_loss_dict,
+                                                                     targets_cat, criterion,
+                                                                     nr_blocks_features_cont,
+                                                                     nr_blocks_features_cat, init_state=True)
+
             # for t > 0
             for (question, answer), nr_obs, timestamp in consultation.observations(
                     shuffle_within_blocks=shuffle_within_blocks, question_blocks=selected_question_blocks,
-                    feature_decode=True
-            ):
+                    feature_decode=True):
+
                 state_before = state.clone()
                 question = question[1]
 
@@ -215,42 +272,16 @@ class MoDNModelMIMICDecode(PatientModel):
 
                     target_obs = consultation.get_decoders_targets(block_per_consultation,
                                                                    question_blocks=selected_question_blocks)
-                    if len(target_obs) > 0:
-                        add_cont_loss = False
-                        add_cat_loss = False
-                        for decoder_cont_question in self.feature_decoders_cont.keys():
-                            target_val = None
-                            for t in block_timesteps[block_per_consultation:]:
-                                if decoder_cont_question == 'Age':
-                                    time = '-1'
-                                else:
-                                    time = str(t)
-                                if not math.isnan(targets_cont[(time, decoder_cont_question)]):
-                                    target_val = targets_cont[(time, decoder_cont_question)]
-                                    break
-                            if target_val:
-                                lss_cont = neg_log_likelihood_1d(torch.tensor(target_val).view(-1, 1),
-                                                                 *self.feature_decoders_cont[decoder_cont_question](
-                                                                     state))
-                                aux_loss_cont_encoded += lss_cont
-                                decoder_loss_dict[decoder_cont_question] += lss_cont
-                                add_cont_loss = True
 
-                        for decoder_cat_question in self.feature_decoders_cat.keys():
-                            target_val = targets_cat[('-1', decoder_cat_question)]
-                            if isinstance(target_val, str):
-                                target_decoder_cat = self.feature_info[('-1', decoder_cat_question)].encoding_dict[
-                                    target_val].view(1)
-                                lss_cat = criterion(self.feature_decoders_cat[decoder_cat_question](state),
-                                                    target_decoder_cat)
-                                aux_loss_cat_encoded += lss_cat
-                                decoder_loss_dict[decoder_cat_question] += lss_cat
-                                add_cat_loss = True
-
-                        if add_cont_loss:
-                            nr_blocks_features_cont += 1
-                        if add_cat_loss:
-                            nr_blocks_features_cat += 1
+                    aux_loss_cont_encoded, aux_loss_cat_encoded,\
+                        decoder_loss_dict, nr_blocks_features_cont,\
+                        nr_blocks_features_cat = self._compute_decoders_loss(target_obs, block_timesteps,
+                                                                             block_per_consultation, targets_cont,
+                                                                             state, aux_loss_cont_encoded,
+                                                                             aux_loss_cat_encoded, decoder_loss_dict,
+                                                                             targets_cat, criterion,
+                                                                             nr_blocks_features_cont,
+                                                                             nr_blocks_features_cat, init_state=False)
 
         aux_loss_cont_encoded /= nr_blocks_features_cont
         aux_loss_cat_encoded /= nr_blocks_features_cat
@@ -348,7 +379,7 @@ class MoDNModelMIMICDecode(PatientModel):
             saved_model_name: str = "modn_plus_model",
             pretrained: bool = False
     ):
-        early_stopper = EarlyStopper(self, wandb_log, self.patience)
+        early_stopper = EarlyStopper(self, wandb_log)
 
         self.feature_info = train_data.feature_info
 
@@ -445,13 +476,13 @@ class MoDNModelMIMICDecode(PatientModel):
 
                 rmse = []
                 for d in self.feature_decoders_cont:
-                    for stage in list(range(0, val_data.timestamps - 1)):
+                    for stage in list(range(-1, val_data.timestamps - 1)):
                         if val_scores[stage].get(f"{d}_rmse"):
                             rmse.append(val_scores[stage][f"{d}_rmse"])
                     logs[f"val_rmse_score_{d}"] = np.array(rmse).mean()
 
                 for d in self.feature_decoders_cat:
-                    f1s = [val_scores[stage][f"{d}_f1"] for stage in list(range(0, val_data.timestamps - 1))]
+                    f1s = [val_scores[stage][f"{d}_f1"] for stage in list(range(-1, val_data.timestamps - 1))]
                     logs[f"val_f1_score_{d}"] = np.array(f1s).mean()
 
                 macro_f1s_disease = [val_scores[stage]["macro_f1_targets"] for stage in
@@ -518,6 +549,94 @@ class MoDNModelMIMICDecode(PatientModel):
             else:
                 save_path = os.path.join('saved_models', saved_model_name + str(epoch + 1) + '_best.pt')
                 self.save_and_store(wandb_log, save_path)
+
+    def compare(self, data):
+
+        self.feature_info = data.feature_info
+        df = data._data.data[0:0]
+        gt_df = data._data.features.iloc[data._indices]
+        gt_df[('-1', 'label')] = data._data.targets.iloc[data._indices]
+
+        test_data_list = []
+        for idx in tqdm(range(len(data))):
+            consultation, targets = data[idx]
+            test_data_list.append((consultation, targets))
+
+        with torch.no_grad():
+            for idx in tqdm(range(len(data))):
+                static_agg = {}
+                results = {}
+                consultation, _ = data[idx]
+
+                # Initialize state for 1 patient
+                state = self.init_state(1)
+
+                # for t > 0
+                for (question, answer), nr_obs, timestep in consultation.observations(
+                        shuffle_within_blocks=None, question_blocks=None, feature_decode=True
+                ):
+                    if int(timestep) == data.timestamps - 1:
+                        break
+                    question = question[1]
+                    state = self.encoders[question](state, answer)
+
+                    # After having encoded a time-block, apply decoders
+                    if nr_obs == 0:
+                        for target_name in data.target_features:
+                            enc_dict = self.feature_info[target_name].encoding_dict
+                            res = np.argmax(self.decoders[target_name](state).softmax(1))
+                            res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
+                            unique_key = target_name[1]
+                            ts = int(timestep) + 1
+                            results[(str(ts), unique_key)] = res
+                            if not static_agg.get(unique_key, None):
+                                static_agg[unique_key] = [res]
+                            else:
+                                static_agg[unique_key].append(res)
+
+                        for target_name in data.unique_features_cont:
+                            res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0][0]
+                            ts = int(timestep) + 1
+                            results[(str(ts), target_name)] = res
+                            if target_name == 'Age':
+                                if not static_agg.get(target_name, None):
+                                    static_agg[target_name] = [res]
+                                else:
+                                    static_agg[target_name].append(res)
+
+                        for target_name in data.unique_features_cat:
+                            enc_dict = self.feature_info[('-1', target_name)].encoding_dict
+                            res = np.argmax(self.feature_decoders_cat[target_name](state).softmax(1))
+                            res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
+                            ts = int(timestep) + 1
+                            results[(str(ts), target_name)] = res
+                            if not static_agg.get(target_name, None):
+                                static_agg[target_name] = [res]
+                            else:
+                                static_agg[target_name].append(res)
+
+                # Aggregate static variables
+                for key, val in static_agg.items():
+                    if key == 'Age':
+                        results[('-1', key)] = np.mean(val)
+                    else:
+                        results[('-1', key)] = max(set(val), key=val.count)
+
+                # Build dataframe
+                row = []
+                for col in df.columns:
+                    if results.get(col, None):
+                        row.append(results[col])
+                    else:
+                        row.append(np.nan)
+                df.loc[idx] = row
+
+                for t in range(1, data.timestamps):
+                    df.loc[idx, (str(t), 'label')] = static_agg['label'][t - 1]
+
+        df = df.sort_index(axis=1)
+
+        return df, gt_df
 
     def generate(self, data):
         # TODO: here
@@ -645,34 +764,48 @@ class MoDNModelMIMICDecode(PatientModel):
 
             for target, preds in predictions_cat.items():
                 missing_val = False
-                for i, position in enumerate(preds.index.values[:-1]):
+                for stage in stages[:-1]:
+                    if stage == -1:
+                        position = "No information"
+                    else:
+                        position = str(stage)
+                    if position not in preds.index.values:
+                        continue
+
                     gt = true_values_cat[('-1', target)]
                     if isinstance(gt, str):
                         p = preds.loc[position]
                         predicted_value = p.index[p.argmax()]
-                        counts[int(position), target, gt, "correct"] += (
+                        counts[stage, target, gt, "correct"] += (
                             1 if gt == predicted_value else 0
                         )
-                        counts[int(position), target, gt, "wrong"] += 1 if gt != predicted_value else 0
-                        correct_predictions[int(position), target] += 1 if gt == predicted_value else 0
+                        counts[stage, target, gt, "wrong"] += 1 if gt != predicted_value else 0
+                        correct_predictions[stage, target] += 1 if gt == predicted_value else 0
                     else:
                         missing_val = True
                 if missing_val:
                     patients_with_missing_val[target] += 1
 
             for target, preds in predictions_cont.items():
-                for i, position in enumerate(preds.index.values[:-1]):
+                for i, stage in enumerate(stages[:-1]):
+                    if stage == -1:
+                        position = "No information"
+                    else:
+                        position = str(stage)
+                    if position not in preds.index.values:
+                        continue
+
                     if target == ('-1', 'Age'):
                         gt = true_values_cont[target]
                         pred_name = 'Age'
                     else:
-                        gt = true_values_cont[(str(preds.index.values[i + 1]), target)]
+                        gt = true_values_cont[(str(preds.index.values[i+1]), target)]
                         pred_name = target
                     if not math.isnan(gt):
                         p = preds.loc[position].values[0]
                         se = np.square(np.subtract(gt, p))
-                        cont_predictions[position, pred_name][0] += se
-                        cont_predictions[position, pred_name][1] += 1
+                        cont_predictions[str(stage), pred_name][0] += se
+                        cont_predictions[str(stage), pred_name][1] += 1
 
             for target, preds in predictions.items():
                 for stage in stages:
@@ -731,8 +864,8 @@ class MoDNModelMIMICDecode(PatientModel):
                             metrics[stage][f"{target}_{choice}_f1"] = 0
                         else:
                             metrics[stage][f"{target}_{choice}_f1"] = counts[stage, target, choice, "correct"] / (
-                                        counts[stage, target, choice, "correct"] + 0.5 * sum(
-                                            counts[stage, target, choice, "wrong"] for choice in choices))
+                                    counts[stage, target, choice, "correct"] + 0.5 * sum(
+                                counts[stage, target, choice, "wrong"] for choice in choices))
 
                     metrics[stage][f"{target}_f1"] = sum(
                         metrics[stage][f"{target}_{choice}_f1"] for choice in choices
@@ -746,7 +879,7 @@ class MoDNModelMIMICDecode(PatientModel):
                 metrics[stage][f"{target}_f1"] for target in test_set.unique_targets
             ) / len(test_set.unique_targets)
 
-            if stage not in [stages[0], stages[-1]]:
+            if stage not in [stages[-1]]:
                 metrics[stage][f"accuracy_targets_cat"] = sum(
                     correct_predictions[stage, target] for target in test_set.unique_features_cat
                 ) / (len(test_set) * len(test_set.unique_features_cat) - sum(patients_with_missing_val.values()))
@@ -796,75 +929,73 @@ class MoDNModelMIMICDecode(PatientModel):
                 info = self.feature_info[('-1', target_feature)]
                 assert info.type == "categorical"
                 assert info.possible_values is not None
-                if target_feature in test_set.unique_targets:
-                    matrix = np.zeros([len(consultation.question_blocks) + 1, len(info.possible_values)]) + 0.5
-                    predictions[target_feature] = pd.DataFrame(
-                        matrix,
-                        columns=info.possible_values,
-                        index=["No information", *time_indexes],
-                    )
+                matrix = np.zeros([len(consultation.question_blocks) + 1, len(info.possible_values)]) + 0.5
+                df = pd.DataFrame(matrix, columns=info.possible_values, index=["No information", *time_indexes])
+
+                if target_feature in test_set.unique_features_cat:
+                    predictions_cat[target_feature] = df
                 else:
-                    matrix = np.zeros([len(consultation.question_blocks), len(info.possible_values)]) + 0.5
-                    predictions_cat[target_feature] = pd.DataFrame(
-                        matrix,
-                        columns=info.possible_values,
-                        index=[*time_indexes],
-                    )
+                    predictions[target_feature] = df
             else:
                 # target is continuous
                 if target_feature == 'Age':
                     target_feature = ('-1', 'Age')
-                matrix = (np.zeros([len(consultation.question_blocks), 1]))
-                predictions_cont[target_feature] = pd.DataFrame(
-                    matrix,
-                    columns=['mu'],
-                    index=[*time_indexes],
-                )
+                matrix = (np.zeros([len(consultation.question_blocks) + 1, 1]))
+                predictions_cont[target_feature] = pd.DataFrame(matrix, columns=['mu'],
+                                                                index=["No information", *time_indexes])
 
         with torch.no_grad():
             state = self.init_state(1)
             for timestep in range(0, len(time_indexes) + 1):
                 if reset_state:
                     state = self.init_state(1)
+                # Only initial state information
                 if timestep == 0:
                     for target_feature in test_set.unique_targets:
                         info = self.feature_info[('-1', target_feature)]
-                        assert info.possible_values is not None
-                        probs = (
-                            self.decoders[('-1', target_feature)](state)
-                            .softmax(1)
-                            .detach()
-                            .numpy()[0]
-                        )
+                        probs = self.decoders[('-1', target_feature)](state).softmax(1).detach().numpy()[0]
                         for k in range(len(info.possible_values)):
                             predictions[target_feature].iloc[timestep, k] = probs[k]
 
+                    for target_feature in test_set.unique_features_cat:
+                        info = self.feature_info[('-1', target_feature)]
+                        probs = self.feature_decoders_cat[target_feature](state).softmax(1).detach().numpy()[0]
+                        for k in range(len(info.possible_values)):
+                            predictions_cat[target_feature].iloc[timestep, k] = probs[k]
+
+                    for target_feature in test_set.unique_features_cont:
+                        prediction_target_feature = target_feature
+                        if target_feature == 'Age':
+                            prediction_target_feature = ('-1', 'Age')
+                        mu = self.feature_decoders_cont[target_feature](state)[0].detach().numpy()[0]
+                        predictions_cont[prediction_target_feature].iloc[timestep, 0] = mu
                 else:
+                    # Encode information for a timestep first
                     observations = consultation.question_blocks[timestep - 1]
                     questions_asked = [obs.question[1] for obs in observations]
-                    # ts = observations[0].question[0]
+
                     for j, q in enumerate(questions_asked):
                         state = self.encoders[q](
                             state, observations[j].answer
                         )
                     for target_feature in test_set.unique_targets:
                         info = self.feature_info[('-1', target_feature)]
-                        assert info.possible_values is not None
                         probs = self.decoders[('-1', target_feature)](state).softmax(1).detach().numpy()[0]
                         for k in range(len(info.possible_values)):
                             predictions[target_feature].iloc[timestep, k] = probs[k]
+
                     if timestep < len(time_indexes):
                         for target_feature in test_set.unique_features_cat:
                             info = self.feature_info[('-1', target_feature)]
                             probs = self.feature_decoders_cat[target_feature](state).softmax(1).detach().numpy()[0]
                             for k in range(len(info.possible_values)):
-                                predictions_cat[target_feature].iloc[timestep - 1, k] = probs[k]
+                                predictions_cat[target_feature].iloc[timestep, k] = probs[k]
                         for target_feature in test_set.unique_features_cont:
                             prediction_target_feature = target_feature
                             if target_feature == 'Age':
                                 prediction_target_feature = ('-1', 'Age')
                             mu = self.feature_decoders_cont[target_feature](state)[0].detach().numpy()[0]
-                            predictions_cont[prediction_target_feature].iloc[timestep - 1, 0] = mu
+                            predictions_cont[prediction_target_feature].iloc[timestep, 0] = mu
 
         return predictions, predictions_cont, predictions_cat
 

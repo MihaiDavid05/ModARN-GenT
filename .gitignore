@@ -13,6 +13,9 @@ __pycache__
 *.pt
 *.onnx
 
+# Data
+*.csv
+
 # wandb
 wandb/
 
