@@ -43,15 +43,15 @@ def generate_plots(model, plots_path, feature_decoding, reset_state, loss_f1, st
 
     if feature_decoding:
         for f in model.feature_decoders_cont:
-            rmse_res = [results[stage][f"{f}_rmse"] for stage in stages[1:-1]]
+            rmse_res = [results[stage][f"{f}_rmse"] for stage in stages[:-1]]
             plots_name = "{}_rmse{}_best{}.pdf".format(f, '_reset_state' if reset_state else '', loss_f1)
             path = os.path.join(plots_path, plots_name)
-            plot(stages[1:-1], rmse_res, path, 'RMSE', 2)
+            plot(stages[:-1], rmse_res, path, 'RMSE', 2)
         for f in model.feature_decoders_cat:
-            f1_res = [results[stage][f"{f}_f1"] for stage in stages[1:-1]]
+            f1_res = [results[stage][f"{f}_f1"] for stage in stages[:-1]]
             plots_name = "{}_f1{}_best{}.pdf".format(f, '_reset_state' if reset_state else '', loss_f1)
             path = os.path.join(plots_path, plots_name)
-            plot(stages[1:-1], f1_res, path, 'Macro F1', 1)
+            plot(stages[:-1], f1_res, path, 'Macro F1', 1)
 
     for f in model.decoders:
         f = f[1]

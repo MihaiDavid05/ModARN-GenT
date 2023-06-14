@@ -12,15 +12,21 @@ from torch import Tensor
 class InitState(nn.Module):
     """Trainable initial state"""
 
-    def __init__(self, state_size):
+    def __init__(self, state_size, random_state=False):
         super().__init__()
         self.state_size = state_size
-        self.state_value = torch.nn.Parameter(
-            torch.randn([1, state_size], requires_grad=True)
-        )
+        self.random_state = random_state
+
+        if not self.random_state:
+            self.state_value = torch.nn.Parameter(torch.randn([1, state_size], requires_grad=True))
 
     def forward(self, n_data_points):
-        init_tensor = torch.tile(self.state_value, [n_data_points, 1])
+        if self.random_state:
+            state_value = torch.nn.Parameter(torch.randn([1, self.state_size]), requires_grad=False)
+            init_tensor = torch.tile(state_value, [n_data_points, 1])
+        else:
+            init_tensor = torch.tile(self.state_value, [n_data_points, 1])
+
         return init_tensor
 
 

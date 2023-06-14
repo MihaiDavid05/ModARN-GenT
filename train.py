@@ -22,6 +22,7 @@ def get_cli_args(parser):
                         help='Whether to reset state at each timestep at validation time')
     parser.add_argument('--wandb_log', action='store_true', help='Log results in wandb or not')
     parser.add_argument('--early_stopping', action='store_true', help='Use early stopping or not')
+    parser.add_argument('--random_init_state', action='store_true', help='Use a random initial state for each patient')
 
     return parser.parse_args()
 
@@ -36,6 +37,7 @@ def main():
     reset_state = args.reset_state
     wandb_log = args.wandb_log
     early_stopping = args.early_stopping
+    random_init_state = args.random_init_state
 
     # Note: Deprecated parameter in case using modn_slow.py script. Leave this as False.
     per_patient = False
@@ -55,7 +57,7 @@ def main():
                 feature_name: 1e-2 for feature_name in data.unique_features_cat
             }
             lr_feature_decoders.update({
-                'F1_constant': 6e-5,
+                'F1_constant': 4e-5,
                 'F2_early': 1e-4,
                 'F3_late': 4e-5,
                 'F4_narrow': 2e-4,
@@ -63,7 +65,7 @@ def main():
                 'Age': 8e-5,
             })
             lr_encoders_val = 1e-2
-            step_size_val = 300
+            step_size_val = 200
             learning_rate_decay_factor = 0.9
             nr_epochs = 800
 
@@ -115,8 +117,9 @@ def main():
             shuffle_patients=True,
             shuffle_within_blocks=True,
             add_state=True,
-            negative_slope=55,
-            patience=20
+            negative_slope=30,
+            patience=50,
+            random_init_state=random_init_state
         )
         # Define model
         model = MoDNModelMIMICDecode(reset_state, parameters=hyper_parameters)

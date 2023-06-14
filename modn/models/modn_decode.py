@@ -78,6 +78,7 @@ class MoDNMIMICHyperparametersDecode(NamedTuple):
     add_state: bool = True
     negative_slope: int = 5
     patience: int = 5
+    random_init_state: bool = False
 
 
 class MoDNModelMIMICDecode(PatientModel):
@@ -116,6 +117,7 @@ class MoDNModelMIMICDecode(PatientModel):
             self.add_state,
             self.negative_slope,
             self.patience,
+            self.random_init_state
         ) = hyper_parameters
 
     def _compute_decoders_loss(self, target_obs, block_timesteps, block_per_consultation, targets_cont, state,
@@ -159,7 +161,8 @@ class MoDNModelMIMICDecode(PatientModel):
                 if add_cat_loss:
                     nr_blocks_features_cat += 1
 
-        return aux_loss_cont_encoded, aux_loss_cat_encoded, decoder_loss_dict, nr_blocks_features_cont, nr_blocks_features_cat
+        return (aux_loss_cont_encoded, aux_loss_cat_encoded, decoder_loss_dict, nr_blocks_features_cont,
+                nr_blocks_features_cat)
 
     def _compute_loss(self, data: list, train: bool = True):
 
@@ -336,7 +339,11 @@ class MoDNModelMIMICDecode(PatientModel):
     def get_optimizer_decoding(self, train_data):
 
         # setup optimizers, the scheduler, and the loss
-        parameter_groups = [{"params": [self.init_state.state_value], "lr": self.lr}]
+        if self.random_init_state:
+            parameter_groups = []
+        else:
+            parameter_groups = [{"params": [self.init_state.state_value], "lr": self.lr}]
+
         parameter_groups.extend(
             {"params": list(self.encoders[encoder_name].parameters()), "lr": self.lr_encoders[encoder_name]}
             for encoder_name in self.encoders
@@ -397,7 +404,7 @@ class MoDNModelMIMICDecode(PatientModel):
             pass
 
         # initiate the initial state, encoders and decoders for features and targets
-        self.init_state = InitState(self.state_size)
+        self.init_state = InitState(self.state_size, self.random_init_state)
 
         self.encoders = self.get_feature_encoders(train_data)
         self.decoders = {
@@ -552,6 +559,42 @@ class MoDNModelMIMICDecode(PatientModel):
 
     def compare(self, data):
 
+        def apply_decoders(d, result, agg, ts=0):
+            for target_name in d.target_features:
+                enc_dict = self.feature_info[target_name].encoding_dict
+                res = np.argmax(self.decoders[target_name](state).softmax(1))
+                res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
+                unique_key = target_name[1]
+                ts = int(ts)
+                result[(str(ts), unique_key)] = res
+                if not agg.get(unique_key, None):
+                    agg[unique_key] = [res]
+                else:
+                    agg[unique_key].append(res)
+
+            for target_name in d.unique_features_cont:
+                res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0][0]
+                ts = int(ts)
+                result[(str(ts), target_name)] = res
+                if target_name == 'Age':
+                    if not agg.get(target_name, None):
+                        agg[target_name] = [res]
+                    else:
+                        agg[target_name].append(res)
+
+            for target_name in d.unique_features_cat:
+                enc_dict = self.feature_info[('-1', target_name)].encoding_dict
+                res = np.argmax(self.feature_decoders_cat[target_name](state).softmax(1))
+                res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
+                ts = int(ts)
+                result[(str(ts), target_name)] = res
+                if not agg.get(target_name, None):
+                    agg[target_name] = [res]
+                else:
+                    agg[target_name].append(res)
+
+            return agg, result
+
         self.feature_info = data.feature_info
         df = data._data.data[0:0]
         gt_df = data._data.features.iloc[data._indices]
@@ -571,49 +614,22 @@ class MoDNModelMIMICDecode(PatientModel):
                 # Initialize state for 1 patient
                 state = self.init_state(1)
 
+                # for t = 0 apply decoders on init state
+                static_agg, results = apply_decoders(data, results, static_agg)
+
                 # for t > 0
                 for (question, answer), nr_obs, timestep in consultation.observations(
                         shuffle_within_blocks=None, question_blocks=None, feature_decode=True
                 ):
+                    # do not encode last timestep as there are no GT
                     if int(timestep) == data.timestamps - 1:
                         break
                     question = question[1]
                     state = self.encoders[question](state, answer)
 
-                    # After having encoded a time-block, apply decoders
+                    # Apply the decoders after encoding entire timeblock
                     if nr_obs == 0:
-                        for target_name in data.target_features:
-                            enc_dict = self.feature_info[target_name].encoding_dict
-                            res = np.argmax(self.decoders[target_name](state).softmax(1))
-                            res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
-                            unique_key = target_name[1]
-                            ts = int(timestep) + 1
-                            results[(str(ts), unique_key)] = res
-                            if not static_agg.get(unique_key, None):
-                                static_agg[unique_key] = [res]
-                            else:
-                                static_agg[unique_key].append(res)
-
-                        for target_name in data.unique_features_cont:
-                            res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0][0]
-                            ts = int(timestep) + 1
-                            results[(str(ts), target_name)] = res
-                            if target_name == 'Age':
-                                if not static_agg.get(target_name, None):
-                                    static_agg[target_name] = [res]
-                                else:
-                                    static_agg[target_name].append(res)
-
-                        for target_name in data.unique_features_cat:
-                            enc_dict = self.feature_info[('-1', target_name)].encoding_dict
-                            res = np.argmax(self.feature_decoders_cat[target_name](state).softmax(1))
-                            res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
-                            ts = int(timestep) + 1
-                            results[(str(ts), target_name)] = res
-                            if not static_agg.get(target_name, None):
-                                static_agg[target_name] = [res]
-                            else:
-                                static_agg[target_name].append(res)
+                        static_agg, results = apply_decoders(data, results, static_agg, timestep)
 
                 # Aggregate static variables
                 for key, val in static_agg.items():
@@ -631,8 +647,9 @@ class MoDNModelMIMICDecode(PatientModel):
                         row.append(np.nan)
                 df.loc[idx] = row
 
-                for t in range(1, data.timestamps):
-                    df.loc[idx, (str(t), 'label')] = static_agg['label'][t - 1]
+                # Build time dependent label
+                for t in range(0, data.timestamps):
+                    df.loc[idx, (str(t), 'label')] = static_agg['label'][t]
 
         df = df.sort_index(axis=1)
 
@@ -740,8 +757,10 @@ class MoDNModelMIMICDecode(PatientModel):
         return df
 
     def save_and_store(self, wandb_log, model_name):
-        # if wandb_log:
-        #     wandb.log_artifact(model_name, name=model_name, type="model")
+        if wandb_log:
+            pass
+            # wandb.log_artifact(model_name, name=model_name, type="model")
+
         self.save_model(model_name)
 
     def evaluate_model_at_multiple_stages(self,
@@ -865,7 +884,7 @@ class MoDNModelMIMICDecode(PatientModel):
                         else:
                             metrics[stage][f"{target}_{choice}_f1"] = counts[stage, target, choice, "correct"] / (
                                     counts[stage, target, choice, "correct"] + 0.5 * sum(
-                                counts[stage, target, choice, "wrong"] for choice in choices))
+                                        counts[stage, target, choice, "wrong"] for choice in choices))
 
                     metrics[stage][f"{target}_f1"] = sum(
                         metrics[stage][f"{target}_{choice}_f1"] for choice in choices
@@ -920,8 +939,7 @@ class MoDNModelMIMICDecode(PatientModel):
         predictions = {}
         predictions_cat = {}
         predictions_cont = {}
-        # if len(consultation.question_blocks) == 0:
-        #     print("No continuous obs")
+
         time_indexes = [q_block[0].question[0] for q_block in consultation.question_blocks]
 
         for target_feature in targets:
@@ -990,6 +1008,7 @@ class MoDNModelMIMICDecode(PatientModel):
                             probs = self.feature_decoders_cat[target_feature](state).softmax(1).detach().numpy()[0]
                             for k in range(len(info.possible_values)):
                                 predictions_cat[target_feature].iloc[timestep, k] = probs[k]
+
                         for target_feature in test_set.unique_features_cont:
                             prediction_target_feature = target_feature
                             if target_feature == 'Age':

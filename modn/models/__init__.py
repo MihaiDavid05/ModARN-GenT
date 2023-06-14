@@ -13,7 +13,7 @@ PredictionEvolution = pd.DataFrame  # matrix (time, class) -> probability
 FeatureNameMIMIC = Tuple[str, str]
 
 
-class PatientModel(ABC):  # pragma: no cover
+class PatientModel(ABC):
     @abstractmethod
     def fit(
         self,
