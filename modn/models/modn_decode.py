@@ -14,9 +14,9 @@ from tqdm.auto import tqdm
 
 from modn.datasets import ConsultationMIMIC, PatientDataset
 from modn.models import FeatureNameMIMIC, PatientModel, Prediction
-from modn.models.modules import EpoctBinaryDecoder, EpoctEncoder, InitState, EpoctCategoricalDecoder
+from modn.models.modules import EpoctBinaryDecoder, EpoctEncoder, InitState, EpoctCategoricalDecoder, EpoctContinuousDecoder
 from modn.models.modules import EpoctDistributionDecoder
-from modn.models.utils import neg_log_likelihood_1d
+from modn.models.utils import neg_log_likelihood_1d, rmse
 
 MetricName = str
 Stage = float
@@ -79,6 +79,7 @@ class MoDNMIMICHyperparametersDecode(NamedTuple):
     negative_slope: int = 5
     patience: int = 5
     random_init_state: bool = False
+    use_rmse: bool = False
 
 
 class MoDNModelMIMICDecode(PatientModel):
@@ -117,7 +118,8 @@ class MoDNModelMIMICDecode(PatientModel):
             self.add_state,
             self.negative_slope,
             self.patience,
-            self.random_init_state
+            self.random_init_state,
+            self.use_rmse
         ) = hyper_parameters
 
     def _compute_decoders_loss(self, target_obs, block_timesteps, block_per_consultation, targets_cont, state,
@@ -137,9 +139,13 @@ class MoDNModelMIMICDecode(PatientModel):
                         target_val = targets_cont[(time, decoder_cont_question)]
                         break
                 if target_val:
-                    lss_cont = neg_log_likelihood_1d(torch.tensor(target_val).view(-1, 1),
-                                                     *self.feature_decoders_cont[decoder_cont_question](
-                                                         state))
+                    if self.use_rmse:
+                        lss_cont = rmse(self.feature_decoders_cont[decoder_cont_question](
+                                                         state), torch.tensor(target_val).view(-1, 1))
+                    else:
+                        lss_cont = neg_log_likelihood_1d(torch.tensor(target_val).view(-1, 1),
+                                                         *self.feature_decoders_cont[decoder_cont_question](
+                                                             state))
                     aux_loss_cont_encoded += lss_cont
                     decoder_loss_dict[decoder_cont_question] += lss_cont
                     add_cont_loss = True
@@ -238,7 +244,7 @@ class MoDNModelMIMICDecode(PatientModel):
                                                                      aux_loss_cat_encoded, decoder_loss_dict,
                                                                      targets_cat, criterion,
                                                                      nr_blocks_features_cont,
-                                                                     nr_blocks_features_cat, init_state=True)
+                                                                     nr_blocks_features_cat, init_state=False)
 
             # for t > 0
             for (question, answer), nr_obs, timestamp in consultation.observations(
@@ -322,10 +328,16 @@ class MoDNModelMIMICDecode(PatientModel):
 
     def get_feature_decoders(self, train_data):
 
-        cont_feature_decoders = {
-            name: EpoctDistributionDecoder(self.state_size, negative_slope=self.negative_slope)
-            for name in train_data.unique_features_cont
-        }
+        if self.use_rmse:
+            cont_feature_decoders = {
+                name: EpoctContinuousDecoder(self.state_size, negative_slope=self.negative_slope)
+                for name in train_data.unique_features_cont
+            }
+        else:
+            cont_feature_decoders = {
+                name: EpoctDistributionDecoder(self.state_size, negative_slope=self.negative_slope)
+                for name in train_data.unique_features_cont
+            }
 
         cat_feature_decoders = {
             name: EpoctCategoricalDecoder(
@@ -573,7 +585,8 @@ class MoDNModelMIMICDecode(PatientModel):
                     agg[unique_key].append(res)
 
             for target_name in d.unique_features_cont:
-                res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0][0]
+                # TODO: here [0]
+                res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0]
                 ts = int(ts)
                 result[(str(ts), target_name)] = res
                 if target_name == 'Age':
@@ -598,7 +611,8 @@ class MoDNModelMIMICDecode(PatientModel):
         self.feature_info = data.feature_info
         df = data._data.data[0:0]
         gt_df = data._data.features.iloc[data._indices]
-        gt_df[('-1', 'label')] = data._data.targets.iloc[data._indices]
+        # TODO: here
+        # gt_df[('-1', 'label')] = data._data.targets.iloc[data._indices]
 
         test_data_list = []
         for idx in tqdm(range(len(data))):
@@ -952,7 +966,7 @@ class MoDNModelMIMICDecode(PatientModel):
 
                 if target_feature in test_set.unique_features_cat:
                     predictions_cat[target_feature] = df
-                else:
+                if target_feature in test_set.unique_targets:
                     predictions[target_feature] = df
             else:
                 # target is continuous
