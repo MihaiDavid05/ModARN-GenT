@@ -1,5 +1,6 @@
 import math
 import os
+import pickle
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Union, Optional
@@ -146,6 +147,8 @@ class MoDNModelMIMICDecode(PatientModel):
                         lss_cont = neg_log_likelihood_1d(torch.tensor(target_val).view(-1, 1),
                                                          *self.feature_decoders_cont[decoder_cont_question](
                                                              state))
+                    if math.isnan(lss_cont):
+                        print("cont")
                     aux_loss_cont_encoded += lss_cont
                     decoder_loss_dict[decoder_cont_question] += lss_cont
                     add_cont_loss = True
@@ -157,6 +160,8 @@ class MoDNModelMIMICDecode(PatientModel):
                         target_val].view(1)
                     lss_cat = criterion(self.feature_decoders_cat[decoder_cat_question](state),
                                         target_decoder_cat)
+                    if math.isnan(lss_cat):
+                        print("cat")
                     aux_loss_cat_encoded += lss_cat
                     decoder_loss_dict[decoder_cat_question] += lss_cat
                     add_cat_loss = True
@@ -234,7 +239,10 @@ class MoDNModelMIMICDecode(PatientModel):
                 enc_dict = self.feature_info[target_name].encoding_dict
                 target = enc_dict[target].view(1)
                 logits1 = self.decoders[target_name](state)
-                disease_loss += criterion(logits1, target)
+                lss = criterion(logits1, target)
+                if math.isnan(lss):
+                    print("disease")
+                disease_loss += lss
 
             aux_loss_cont_encoded, aux_loss_cat_encoded, \
                 decoder_loss_dict, nr_blocks_features_cont, \
@@ -256,25 +264,19 @@ class MoDNModelMIMICDecode(PatientModel):
 
                 state = self.encoders[question](state, answer)
                 lss1 = torch.mean((state - state_before) ** 2)
+                if math.isnan(lss1):
+                    print("state")
                 state_changes_loss += lss1
-                # print("After 1 encoder state loss is {}:".format(lss1))
-                # if lss1 > 10:
-                #     print(question)
-                #     print("Big state loss {}".format(lss1))
 
-                # After having encoded a time-block, apply a disease decoder
                 if nr_obs == 0:
                     for idx2, (target_name, target) in enumerate(targets.items()):
                         enc_dict = self.feature_info[target_name].encoding_dict
                         target = enc_dict[target].view(1)
                         logits2 = self.decoders[target_name](state)
                         lss2 = criterion(logits2, target)
+                        if math.isnan(lss2):
+                            print("disease")
                         disease_loss += lss2
-
-                        # print("After 1 decoder loss is {}:".format(lss2))
-                        # if lss2 > 50:
-                        #     print(question)
-                        #     print("Big decode loss {}".format(lss2))
 
                     nr_blocks += 1
                     block_per_consultation += 1
@@ -302,6 +304,7 @@ class MoDNModelMIMICDecode(PatientModel):
                 + disease_loss * self.diseases_loss_weight
                 + state_changes_loss * self.state_changes_loss_weight
         )
+
         losses = {
             "loss": loss,
             "disease_loss": disease_loss,
@@ -403,14 +406,7 @@ class MoDNModelMIMICDecode(PatientModel):
         self.feature_info = train_data.feature_info
 
         if pretrained:
-            # TODO: Build and check code for pretrianing
-            # assert self.init_state is not None
-            # assert self.encoders is not None
-            # assert self.decoders is not None
-            # assert self.feature_decoders_cat is not None
-            # assert self.feature_decoders_cont is not  None
-            # assert self.feature_info is not None
-            #
+            # TODO: Build and check code for fine-tuning
             # unique_features = set(train_data.unique_features).difference(set(self.encoders.keys()))
             # encoders = self.encoders
             pass
@@ -445,37 +441,18 @@ class MoDNModelMIMICDecode(PatientModel):
             consultation, targets = test_data[idx]
             test_data_list.append((consultation, targets))
 
+        norm_dict = {'init_state': []}
         # feed data into the modules and train them with one question / answer pair at a time
         print("\nTraining the model")
         for epoch in range(self.num_epochs):
             optimizer.zero_grad()
             train_losses, train_decoder_losses = self._compute_loss(train_data_list)
 
-            # for enc_name, enc in self.encoders.items():
-            #     print(enc_name)
-            #     print(enc.fc1.weight.norm())
-            #     print(enc.fc2.weight.norm())
-            # for dec_name, dec in self.decoders.items():
-            #     print(dec_name)
-            #     print(dec.fc1.weight.norm())
-
             train_losses["loss"].backward()
-
-            # for enc_name, module in self.encoders.items():
-            #     print(enc_name)
-            #     for name, p in module.named_parameters():
-            #         print(name)
-            #         print(p.grad.norm())
 
             for param_dict in optimizer.param_groups:
                 for p in param_dict["params"]:
                     torch.nn.utils.clip_grad_norm_(p, max_norm=self.gradient_clipping)
-
-            # for enc_name, module in self.encoders.items():
-            #     print(enc_name)
-            #     for name, p in module.named_parameters():
-            #         print(name)
-            #         print(p.grad.norm())
 
             # compute test losses and metrics
             with torch.no_grad():
@@ -504,37 +481,26 @@ class MoDNModelMIMICDecode(PatientModel):
                     f1s = [val_scores[stage][f"{d}_f1"] for stage in list(range(-1, val_data.timestamps - 1))]
                     logs[f"val_f1_score_{d}"] = np.array(f1s).mean()
 
-                macro_f1s_disease = [val_scores[stage]["macro_f1_targets"] for stage in
-                                     list(range(-1, val_data.timestamps))]
-                val_f1_scores_disease = np.array(macro_f1s_disease).mean()
+                if val_scores[stage].get("macro_f1_targets", None):
+                    macro_f1s_disease = [val_scores[stage]["macro_f1_targets"] for stage in
+                                         list(range(-1, val_data.timestamps))]
+                    val_f1_scores_disease = np.array(macro_f1s_disease).mean()
+                else:
+                    val_f1_scores_disease = 0
 
             optimizer.step()
             scheduler.step()
 
-            # for enc_name, enc in self.encoders.items():
-            #     print(enc_name)
-            #     print(enc.fc1.weight.norm())
-            #     print(enc.fc2.weight.norm())
-            # for dec_name, dec in self.decoders.items():
-            #     print(dec_name)
-            #     print(dec.fc1.weight.norm())
-
             print(
                 f"Epoch: {epoch + 1}/{self.num_epochs}\n"
                 + f"train_loss: {train_losses['loss']:.4f}\n"
-                + f"disease_loss: {train_losses['disease_loss']:.4f}\n"
-                + f"state_changes_loss: {train_losses['state_changes_loss']:.4f}\n"
-                + f"aux_loss_cont_encoded: {train_losses['aux_loss_cont_encoded']:.4f}\n"
-                + f"aux_loss_cat_encoded: {train_losses['aux_loss_cat_encoded']:.4f}\n"
                 + f"test_loss: {test_losses['loss']:.4f}\n"
                 + f"test_disease_loss: {test_losses['disease_loss']:.4f}\n"
-                + f"test_state_changes_loss: {test_losses['state_changes_loss']:.4f}\n"
-                + f"test_aux_loss_cont_encoded: {test_losses['aux_loss_cont_encoded']:.4f}\n"
-                + f"test_aux_loss_cat_encoded: {test_losses['aux_loss_cat_encoded']:.4f}\n"
-                + f"val_f1_score_disease: {val_f1_scores_disease:.4f}"
             )
 
             if math.isnan(train_losses["loss"]):
+                with open('norm_dict_learned_init.pkl', 'wb') as fp:
+                    pickle.dump(norm_dict, fp)
                 raise ValueError("NaN loss encountered")
 
             if wandb_log:
@@ -569,6 +535,9 @@ class MoDNModelMIMICDecode(PatientModel):
                 save_path = os.path.join('saved_models', saved_model_name + str(epoch + 1) + '_best.pt')
                 self.save_and_store(wandb_log, save_path)
 
+        with open('norm_dict_learned_init.pkl', 'wb') as fp:
+            pickle.dump(norm_dict, fp)
+
     def compare(self, data):
 
         def apply_decoders(d, result, agg, ts=0):
@@ -585,7 +554,7 @@ class MoDNModelMIMICDecode(PatientModel):
                     agg[unique_key].append(res)
 
             for target_name in d.unique_features_cont:
-                # TODO: here [0]
+                # TODO: Here [0]
                 res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0]
                 ts = int(ts)
                 result[(str(ts), target_name)] = res
@@ -611,8 +580,6 @@ class MoDNModelMIMICDecode(PatientModel):
         self.feature_info = data.feature_info
         df = data._data.data[0:0]
         gt_df = data._data.features.iloc[data._indices]
-        # TODO: here
-        # gt_df[('-1', 'label')] = data._data.targets.iloc[data._indices]
 
         test_data_list = []
         for idx in tqdm(range(len(data))):
@@ -904,13 +871,14 @@ class MoDNModelMIMICDecode(PatientModel):
                         metrics[stage][f"{target}_{choice}_f1"] for choice in choices
                     ) / len(choices)
 
-            metrics[stage][f"accuracy_targets"] = sum(
-                correct_predictions[stage, target] for target in test_set.unique_targets
-            ) / (len(test_set) * len(test_set.unique_targets))
+            if len(test_set.unique_targets) > 0:
+                metrics[stage][f"accuracy_targets"] = sum(
+                    correct_predictions[stage, target] for target in test_set.unique_targets
+                ) / (len(test_set) * len(test_set.unique_targets))
 
-            metrics[stage][f"macro_f1_targets"] = sum(
-                metrics[stage][f"{target}_f1"] for target in test_set.unique_targets
-            ) / len(test_set.unique_targets)
+                metrics[stage][f"macro_f1_targets"] = sum(
+                    metrics[stage][f"{target}_f1"] for target in test_set.unique_targets
+                ) / len(test_set.unique_targets)
 
             if stage not in [stages[-1]]:
                 metrics[stage][f"accuracy_targets_cat"] = sum(
