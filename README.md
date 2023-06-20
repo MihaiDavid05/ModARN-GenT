@@ -5,7 +5,7 @@ Generative Modular Autoregressive Networks for Medical Time-Series
 Bla bla 
 
 # Installation
-The code runs completely on CPU, therefore are no CUDA dependencies and the installation is very simple.
+The code runs completely on CPU, therefore there are no CUDA dependencies and the installation is very simple.
 Please use the following command to install the required libraries:
 ```bash
  pip install -r requirements.txt
@@ -60,6 +60,10 @@ python train.py --dataset_type toy
 In the above command the training is done on the toy dataset, using feature decoders and a random initial state.
 Early stopping is used and the experiments progress are tracked using wandb.
 
+All the experiments are saved under `saved_models` folder.
+
+The hyperparameters for each type of network are defined at the script level.
+
 ### Evaluation
 
 Use the `evaluation.py` script for evaluation. 
@@ -70,13 +74,15 @@ python evaluate.py --model_file <checkpoint_name>.pt
 ```
 You can choose to reset (re-initialize) the state after each timestep with the `--reset_state` flag.
 
+Plots with metrics will be created under the `plots` folder.
+
 ### Generation or prediction
 
-Use the `generate_compare.py` script to either predict or generate data under dataframe format.
+Use the `generate_compare.py` script to either predict or generate data under a dataframe format.
 
 ```bash
 python generate.py --model_file <checkpoint_name>.pt
                    --output_path <output_dataframe_name>.csv
 ```
 With the above command a dataframe will be predicted using the given model.
-If you want to generate data with a model, you need to add the `--generate` flag to the command and TODO.
+If you want to generate data with a model, you need to add the `--generate` flag to the above command and TODO.
