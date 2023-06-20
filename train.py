@@ -23,7 +23,7 @@ def get_cli_args(parser):
     parser.add_argument('--wandb_log', action='store_true', help='Log results in wandb or not')
     parser.add_argument('--early_stopping', action='store_true', help='Use early stopping or not')
     parser.add_argument('--random_init_state', action='store_true', help='Use a random initial state for each patient')
-    parser.add_argument('--use_rmse', action='store_true', help='Use rmse as loss and Continuous decoder')
+    parser.add_argument('--use_rmse', action='store_true', help='Use rmse as loss and continuous decoder instead of distribution loss and decoders')
 
     return parser.parse_args()
 
