@@ -28,16 +28,8 @@ class PatientModel(ABC):
         pass
 
     @abstractmethod
-    def predict(
-        self, consultation: ConsultationMIMIC, targets: List[FeatureNameMIMIC], reset_state: bool
-    ) -> Dict[FeatureNameMIMIC, Prediction]:
-        """Final prediction after the consultation is finished"""
-        pass
-
-    @abstractmethod
     def predict_evolution(
         self, consultation: ConsultationMIMIC, targets: List[FeatureNameMIMIC], reset_state: bool,
             test_set: PatientDataset = None
     ) -> Dict[FeatureNameMIMIC, PredictionEvolution]:
-        """Give a prediction after each new question"""
         pass

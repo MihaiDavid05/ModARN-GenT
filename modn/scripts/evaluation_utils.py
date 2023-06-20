@@ -5,6 +5,7 @@ import matplotlib.lines as mlines
 
 
 def get_plots_path(model_name):
+    """Define and create path for saving plots"""
     plots_path = os.path.join('plots', model_name.split('.')[0])
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
@@ -13,6 +14,7 @@ def get_plots_path(model_name):
 
 
 def plot(stages, results, plots_path, label, ylim):
+    """Plot the metrics"""
 
     if label == 'RMSE':
         point_label = 'min'

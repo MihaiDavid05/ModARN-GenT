@@ -71,6 +71,8 @@ class ConsultationMIMIC(NamedTuple):
 
 
 class DataPointMIMIC(NamedTuple):
+    """Entry point in the dataset"""
+
     consultation: ConsultationMIMIC
     targets: Union[Dict[Tuple[str, str], int], List[Dict[Tuple[str, str], int]]]
 

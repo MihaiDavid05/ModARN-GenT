@@ -154,10 +154,6 @@ class MoDNModelMIMIC(PatientModel):
                 state = self.encoders[question](state, answer)
                 lss1 = torch.mean((state - state_before) ** 2)
                 state_changes_loss += lss1
-                # print("After 1 encoder state loss is {}:".format(lss1))
-                # if lss1 > 20:
-                #     print(question)
-                #     print("Big state loss {}".format(lss1))
                 if nr_obs == 0:
                     for idx2, (target_name, target) in enumerate(targets.items()):
                         enc_dict = self.feature_info[target_name].encoding_dict
@@ -165,10 +161,6 @@ class MoDNModelMIMIC(PatientModel):
                         logits2 = self.decoders[target_name](state)
                         lss2 = criterion(logits2, target)
                         disease_loss += lss2
-                        # print("After 1 decoder state loss is {}:".format(lss2))
-                        # if lss2 > 20:
-                        #     print(question)
-                        #     print("Big decode loss {}".format(lss2))
                     nr_blocks += 1
 
         loss = (
@@ -176,11 +168,10 @@ class MoDNModelMIMIC(PatientModel):
                 + state_changes_loss * self.state_changes_loss_weight
         )
 
-        # TODO: Check here
         losses = {
-            "loss": loss,# / nr_blocks,
-            "disease_loss": disease_loss,# / nr_blocks,
-            "state_changes_loss": state_changes_loss,# / nr_blocks,
+            "loss": loss / nr_blocks,
+            "disease_loss": disease_loss / nr_blocks,
+            "state_changes_loss": state_changes_loss / nr_blocks,
         }
 
         return losses
@@ -266,32 +257,11 @@ class MoDNModelMIMIC(PatientModel):
         for epoch in range(self.num_epochs):
             optimizer.zero_grad()
             train_losses = self._compute_loss(train_data_list)
-
-            # for enc_name, enc in self.encoders.items():
-            #     print(enc_name)
-            #     print(enc.fc1.weight.norm())
-            #     print(enc.fc2.weight.norm())
-            # for dec_name, dec in self.decoders.items():
-            #     print(dec_name)
-            #     print(dec.fc1.weight.norm())
-            # print(train_losses['disease_loss'], train_losses['state_changes_loss'])
             train_losses["loss"].backward()
-
-            # for enc_name, module in self.encoders.items():
-            #     print(enc_name)
-            #     for name, p in module.named_parameters():
-            #         print(name)
-            #         print(p.grad.norm())
 
             for param_dict in optimizer.param_groups:
                 for p in param_dict["params"]:
                     torch.nn.utils.clip_grad_norm_(p, max_norm=self.gradient_clipping)
-
-            # for enc_name, module in self.encoders.items():
-            #     print(enc_name)
-            #     for name, p in module.named_parameters():
-            #         print(name)
-            #         print(p.grad.norm())
 
             # compute test losses
             with torch.no_grad():
@@ -306,14 +276,6 @@ class MoDNModelMIMIC(PatientModel):
 
             optimizer.step()
             scheduler.step()
-
-            # for enc_name, enc in self.encoders.items():
-            #     print(enc_name)
-            #     print(enc.fc1.weight.norm())
-            #     print(enc.fc2.weight.norm())
-            # for dec_name, dec in self.decoders.items():
-            #     print(dec_name)
-            #     print(dec.fc1.weight.norm())
 
             print(
                 f"Epoch: {epoch + 1}/{self.num_epochs}\n"
@@ -426,16 +388,6 @@ class MoDNModelMIMIC(PatientModel):
             ) / len(targets)
 
         return metrics
-
-    def predict(
-            self,
-            consultation: ConsultationMIMIC,
-            targets: List[FeatureNameMIMIC],
-            reset_state: bool
-    ) -> Dict[FeatureNameMIMIC, Prediction]:
-        """Final prediction after the consultation is finished"""
-        results = self.predict_evolution(consultation=consultation, targets=targets, reset_state=reset_state)
-        return {f: d.iloc[-1, :] for f, d in results.items()}  # type: ignore
 
     def predict_evolution(
             self, consultation: ConsultationMIMIC, targets: List[FeatureNameMIMIC], reset_state: bool,

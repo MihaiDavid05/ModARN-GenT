@@ -14,13 +14,6 @@ from modn.datasets import DataPointMIMIC, ConsultationMIMIC, ObservationMIMIC, F
 class MIMICDataset(PatientDataset):
 
     # Define toy dataset features
-    # feature_toy_static = ['Age', 'gender', 'insurance']
-    # feature_toy = ['F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide'] + feature_toy_static
-    # target_toy = ["label"]
-    # # feature_toy_cont = ['Age', 'F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide']
-    # feature_toy_cont = ['F1_constant']
-    # feature_toy_cat = ['gender', 'insurance']
-
     feature_toy_static = ['Age', 'gender', 'insurance', 'label']
     feature_toy = ['F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide'] + feature_toy_static
     # target_toy = ["label"]
@@ -29,12 +22,13 @@ class MIMICDataset(PatientDataset):
     feature_toy_cat = ['gender', 'insurance', 'label']
 
     # Define small dataset features
-    feature_small_static = ['Age', 'gender', 'ethnicity', 'insurance']
+    feature_small_static = ['Age', 'gender', 'ethnicity', 'insurance', 'label']
     feature_small = ['WBC', 'Chloride (serum)', 'Glucose (serum)', 'Magnesium', 'Sodium (serum)', 'BUN', 'Phosphorous',
                      'Anion gap', 'Potassium (serum)', 'HCO3 (serum)', 'Platelet Count', 'Prothrombin time', 'PTT',
                      'Lactic Acid'] + feature_small_static
-    target_small = ["label"]
-    feature_small_cat = ['ethnicity', 'gender', 'insurance']
+    # target_small = ["label"]
+    target_small = []
+    feature_small_cat = ['ethnicity', 'gender', 'insurance', 'label']
     feature_small_cont = feature_small[:15]
 
     def __init__(

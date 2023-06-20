@@ -149,7 +149,6 @@ class EpoctCategoricalDecoder(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         x = F.relu(self.fc1(x))
 
-        # NOTE: Took F.log_softmax() later
         return self.fc2(x)
 
 

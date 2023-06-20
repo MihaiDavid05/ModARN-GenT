@@ -41,9 +41,6 @@ def main():
     random_init_state = args.random_init_state
     use_rmse = args.use_rmse
 
-    # Note: Deprecated parameter in case using modn_slow.py script. Leave this as False.
-    per_patient = False
-
     # Initialize dataset
     data = MIMICDataset(os.path.join(DATA_ABS_PATH, "MIMIC_data_labels_{}.csv".format(dataset_type)),
                         data_type=dataset_type, global_question_block=False,
@@ -139,9 +136,8 @@ def main():
         patience = 30
         learning_rate_decay_factor = 0.9
 
-        model_name = "Exp_{}_MaxEpochs_{}_{}{}{}".format(exp_id, nr_epochs, dataset_type,
-                                                         'feat_decode' if feature_decoding else '',
-                                                         '_per_patient' if per_patient else '')
+        model_name = "Exp_{}_MaxEpochs_{}_{}{}".format(exp_id, nr_epochs, dataset_type,
+                                                       'feat_decode' if feature_decoding else '')
         # Define MoDN hyper parameters
         hyper_parameters = MoDNMIMICHyperparameters(
             num_epochs=nr_epochs,

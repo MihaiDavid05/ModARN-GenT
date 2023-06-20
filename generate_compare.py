@@ -48,7 +48,11 @@ def main():
     m.load_model(model_path)
 
     if generate:
-        default_info = [('gender', 'M'), ('gender', 'F'), ('gender', 'F'), ('gender', 'F'), ('gender', 'M')]
+        # TODO: Here read data from a file or other place. Only static features supported as default features!
+        default_info = [[('gender', 'M'), ('label', 'Yes'), ('Age', 30)],
+                        [('gender', 'M'), ('label', 'No'), ('Age', 50)],
+                        [('gender', 'F'), ('label', 'Yes'), ('Age', 80)],
+                        [('gender', 'F'), ('label', 'No'), ('Age', 25)]]
         df = m.generate(test, default_info)
     else:
         df, gt_df = m.compare(test)
