@@ -67,7 +67,7 @@ def main():
                 'Age': 8e-5
             })
             lr_encoders_val = 1e-2
-            step_size_val = 200
+            step_size_val = 250
             learning_rate_decay_factor = 0.9
             nr_epochs = 2000
 
