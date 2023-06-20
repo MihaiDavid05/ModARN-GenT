@@ -23,7 +23,8 @@ class MIMICDataset(PatientDataset):
 
     feature_toy_static = ['Age', 'gender', 'insurance', 'label']
     feature_toy = ['F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide'] + feature_toy_static
-    target_toy = ["label"]
+    # target_toy = ["label"]
+    target_toy = []
     feature_toy_cont = ['Age', 'F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide']
     feature_toy_cat = ['gender', 'insurance', 'label']
 

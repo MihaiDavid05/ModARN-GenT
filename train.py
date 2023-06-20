@@ -69,7 +69,7 @@ def main():
             lr_encoders_val = 1e-2
             step_size_val = 200
             learning_rate_decay_factor = 0.9
-            nr_epochs = 1000
+            nr_epochs = 2000
 
         else:
             lr_feature_decoders = {
