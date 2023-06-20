@@ -554,8 +554,10 @@ class MoDNModelMIMICDecode(PatientModel):
                     agg[unique_key].append(res)
 
             for target_name in d.unique_features_cont:
-                # TODO: Here [0]
-                res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0]
+                if self.use_rmse:
+                    res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0]
+                else:
+                    res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0][0]
                 ts = int(ts)
                 result[(str(ts), target_name)] = res
                 if target_name == 'Age':
@@ -636,11 +638,11 @@ class MoDNModelMIMICDecode(PatientModel):
 
         return df, gt_df
 
-    def generate(self, data):
-        # TODO: here
-        timesteps = 10
+    def generate(self, data, default_info):
+        # TODO: Make this more generic
+
+        timesteps = data.timestamps
         df = data._data.data[0:0]
-        default_info = [('gender', 'M'), ('gender', 'F')]
 
         for i in range(len(default_info)):
 
@@ -653,6 +655,7 @@ class MoDNModelMIMICDecode(PatientModel):
                 state = self.init_state(1)
 
                 # Encode with existing information
+                # TODO: Make this more generic
                 enc_dict = self.feature_info[('-1', info[0])].encoding_dict
                 info_value = enc_dict[info[1]].view(1)
                 state = self.encoders[info[0]](state, info_value)

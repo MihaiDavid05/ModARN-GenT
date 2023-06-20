@@ -48,7 +48,8 @@ def main():
     m.load_model(model_path)
 
     if generate:
-        df = m.generate(test)
+        default_info = [('gender', 'M'), ('gender', 'F'), ('gender', 'F'), ('gender', 'F'), ('gender', 'M')]
+        df = m.generate(test, default_info)
     else:
         df, gt_df = m.compare(test)
         gt_df.to_csv('GT_test_data.csv', index=False)
