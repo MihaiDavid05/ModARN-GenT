@@ -590,7 +590,7 @@ class MoDNModelMIMICDecode(PatientModel):
 
                     # Apply the decoders after encoding entire timeblock
                     if nr_obs == 0:
-                        static_agg, results = apply_decoders(data, results, static_agg, timestep + 1)
+                        static_agg, results = apply_decoders(data, results, static_agg, int(timestep) + 1)
 
                 # Aggregate static variables
                 for key, val in static_agg.items():
@@ -647,10 +647,10 @@ class MoDNModelMIMICDecode(PatientModel):
                 # Decode for first timestep
                 for target_name in data.unique_features_cont:
                     if target_name in patient_obs:
-                        results[('1', target_name)] = dict_info[target_name]
+                        res = dict_info[target_name]
                     else:
                         res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0][0]
-                        results[('1', target_name)] = res
+                    results[('1', target_name)] = res
                     if target_name == 'Age':
                         if not static_agg.get(target_name, None):
                             static_agg[target_name] = [res]
@@ -661,11 +661,11 @@ class MoDNModelMIMICDecode(PatientModel):
                     enc_dict = self.feature_info[target_name].encoding_dict
                     unique_key = target_name[1]
                     if unique_key in patient_obs:
-                        results[('1', unique_key)] = dict_info[unique_key]
+                        res = dict_info[unique_key]
                     else:
                         res = np.argmax(self.decoders[target_name](state).softmax(1).detach().numpy()[0])
                         res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
-                        results[('1', unique_key)] = res
+                    results[('1', unique_key)] = res
                     if not static_agg.get(unique_key, None):
                         static_agg[unique_key] = [res]
                     else:
@@ -674,11 +674,11 @@ class MoDNModelMIMICDecode(PatientModel):
                 for target_name in data.unique_features_cat:
                     enc_dict = self.feature_info[('-1', target_name)].encoding_dict
                     if target_name in patient_obs:
-                        results[('1', target_name)] = dict_info[target_name]
+                        res = dict_info[target_name]
                     else:
                         res = np.argmax(self.feature_decoders_cat[target_name](state).softmax(1))
                         res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
-                        results[('1', target_name)] = res
+                    results[('1', target_name)] = res
                     if not static_agg.get(target_name, None):
                         static_agg[target_name] = [res]
                     else:
@@ -692,10 +692,10 @@ class MoDNModelMIMICDecode(PatientModel):
                     # Decode again
                     for target_name in data.unique_features_cont:
                         if target_name in patient_obs:
-                            results[(str(t), target_name)] = dict_info[target_name]
+                            res = dict_info[target_name]
                         else:
                             res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0][0]
-                            results[(str(t), target_name)] = res
+                        results[(str(t), target_name)] = res
                         if target_name == 'Age':
                             if not static_agg.get(target_name, None):
                                 static_agg[target_name] = [res]
@@ -705,11 +705,11 @@ class MoDNModelMIMICDecode(PatientModel):
                     for target_name in data.unique_features_cat:
                         enc_dict = self.feature_info[('-1', target_name)].encoding_dict
                         if target_name in patient_obs:
-                            results[(str(t), target_name)] = dict_info[target_name]
+                            res = dict_info[target_name]
                         else:
                             res = np.argmax(self.feature_decoders_cat[target_name](state).softmax(1))
                             res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
-                            results[(str(t), target_name)] = res
+                        results[(str(t), target_name)] = res
                         if not static_agg.get(target_name, None):
                             static_agg[target_name] = [res]
                         else:
@@ -719,11 +719,11 @@ class MoDNModelMIMICDecode(PatientModel):
                         enc_dict = self.feature_info[target_name].encoding_dict
                         unique_key = target_name[1]
                         if unique_key in patient_obs:
-                            results[('1', unique_key)] = dict_info[unique_key]
+                            res = dict_info[target_name]
                         else:
                             res = np.argmax(self.decoders[target_name](state).softmax(1).detach().numpy()[0])
                             res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
-                            results[(str(t), unique_key)] = res
+                        results[(str(t), unique_key)] = res
                         if not static_agg.get(unique_key, None):
                             static_agg[unique_key] = [res]
                         else:

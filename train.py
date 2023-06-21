@@ -64,6 +64,7 @@ def main():
                 'Age': 8e-5
             })
             lr_encoders_val = 1e-2
+            # TODO: Change this maybe
             step_size_val = 250
             learning_rate_decay_factor = 0.9
             nr_epochs = 2000
@@ -90,9 +91,9 @@ def main():
                 'Age': 1e-9
             })
             lr_encoders_val = 1e-2
-            step_size_val = 200
+            step_size_val = 300
             learning_rate_decay_factor = 0.9
-            nr_epochs = 500
+            nr_epochs = 3000
 
         lr_encoders = {feature_name: lr_encoders_val for feature_name in data.unique_features}
 
