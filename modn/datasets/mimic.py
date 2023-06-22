@@ -29,8 +29,7 @@ class MIMICDataset(PatientDataset):
     # target_small = ["label"]
     target_small = []
     feature_small_cat = ['ethnicity', 'gender', 'insurance', 'label']
-    feature_small_cont = ['WBC']
-    # feature_small_cont = feature_small[:15]
+    feature_small_cont = feature_small[:15]
 
     def __init__(
             self,
