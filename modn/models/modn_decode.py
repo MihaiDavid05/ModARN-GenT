@@ -797,25 +797,33 @@ class MoDNModelMIMICDecode(PatientModel):
                     patients_with_missing_val[target] += 1
 
             for target, preds in predictions_cont.items():
-                for i, stage in enumerate(stages[:-1]):
+                i = 0
+                for stage in stages[:-1]:
                     if stage == -1:
                         position = "No information"
                     else:
                         position = str(stage)
-                    if position not in preds.index.values:
+                    if position not in preds.index.values or position == preds.index.values[-1]:
                         continue
+                    else:
+                        i += 1
 
                     if target == ('-1', 'Age'):
                         gt = true_values_cont[target]
                         pred_name = 'Age'
-                    else:
-                        gt = true_values_cont[(str(preds.index.values[i+1]), target)]
-                        pred_name = target
-                    if not math.isnan(gt):
                         p = preds.loc[position].values[0]
                         se = np.square(np.subtract(gt, p))
                         cont_predictions[str(stage), pred_name][0] += se
                         cont_predictions[str(stage), pred_name][1] += 1
+                    else:
+                        # TODO: here
+                        gt = true_values_cont[(str(preds.index.values[i]), target)]
+                        pred_name = target
+                        if not math.isnan(gt):
+                            p = preds.loc[position].values[0]
+                            se = np.square(np.subtract(gt, p))
+                            cont_predictions[str(stage), pred_name][0] += se
+                            cont_predictions[str(stage), pred_name][1] += 1
 
             for target, preds in predictions.items():
                 for stage in stages:
