@@ -55,12 +55,20 @@ def main():
             lr_feature_decoders = {
                 feature_name: 1e-2 for feature_name in data.unique_features_cat
             }
+            # lr_feature_decoders.update({
+            #     'F1_constant': 8e-5,
+            #     'F2_early': 1e-4,
+            #     'F3_late': 4e-5,
+            #     'F4_narrow': 2e-4,
+            #     'F5_wide': 2e-4,
+            #     'Age': 8e-5
+            # })
             lr_feature_decoders.update({
                 'F1_constant': 8e-5,
-                'F2_early': 1e-4,
-                'F3_late': 4e-5,
-                'F4_narrow': 2e-4,
-                'F5_wide': 2e-4,
+                'F2_early': 1e-5,
+                'F3_late': 4e-6,
+                'F4_narrow': 2e-5,
+                'F5_wide': 2e-6,
                 'Age': 8e-5
             })
             lr_encoders_val = 1e-2

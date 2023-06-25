@@ -13,10 +13,11 @@ Please use the following command to install the required libraries:
 
 # Data
 Entire data should be stored under `modn_data` folder. To generate the toy dataset you can use the functions from
-the `Data_Generation.ipynb` notebook. To generate the MIMIC sub-dataset you can use the `MIMIC_Data_Pipeline.ipynb` notebook,
-after you download the MIMIC-IV dataset by following the steps from [here](https://github.com/healthylaife/MIMIC-IV-Data-Pipeline#Steps-to-download-MIMIC-IV-dataset-for-the-pipeline).
-This notebook is a custom version from [this](https://github.com/healthylaife/MIMIC-IV-Data-Pipeline/blob/main/mainPipeline.ipynb) notebook under [this](https://github.com/healthylaife/MIMIC-IV-Data-Pipeline) repo.
-Otherwise, please ask the previous student responsible for the project.
+the `Data_Generation.ipynb` notebook.
+
+To generate the MIMIC sub-dataset you need to clone [this](https://github.com/healthylaife/MIMIC-IV-Data-Pipeline) repo, do the setup and installation steps, download the MIMIC-IV dataset by following the steps from the same repo and replace their `mainPipeline.ipynb` notebook with the one under `modn/notebooks/MIMIC_Data_Pipeline.ipynb`.
+This notebook is a custom version that also includes the code for the MIMIC subset generation.
+Otherwise, for having the MIMIC subset, please ask the previous student responsible for the project (Mihai David).
 
 # Code structure
 ```
@@ -30,19 +31,20 @@ Otherwise, please ask the previous student responsible for the project.
 │   │   ├─── modn_decode.py
 │   │   ├─── modules.py
 │   │   └─── utils.py
-│   ├───notebooks                   
+│   ├───notebooks
+│   │   ├─── MIMIC_Data_Pipeline.ipynb                   
 │   │   └─── Data_Generation.ipynb
-│   └───scripts                  ---> helpers
+│   └───scripts                    ---> helpers
 │       ├─── data_inspect.py
 │       ├─── explore_patient.py
 │       └─── evaluation_utils.py
-├───modn_data                    ---> data folder
-├───plots                        ---> plots folder
-├───saved models                  ---> models folder
+├───modn_data                      ---> data folder
+├───plots                          ---> plots folder
+├───saved models                   ---> models folder
 ├───requirements.txt                
-├───evaluate.py                  ---> evaluation
-├───generate_compare.py          ---> data generation and prediction
-└───train.py                     ---> training
+├───evaluate.py                    ---> evaluation
+├───generate_compare.py            ---> data generation and prediction
+└───train.py                       ---> training
 ```
 
 # Usage
