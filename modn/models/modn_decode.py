@@ -627,22 +627,22 @@ class MoDNModelMIMICDecode(PatientModel):
             results = {}
             static_agg = {}
             info = default_info[i]
-            dict_info = dict(info)
-            patient_obs = [obs[0] for obs in info]
+            dict_info = info._asdict()
+            patient_obs = list(dict_info.keys())
 
             with torch.no_grad():
                 # Initialize state for a patient
                 state = self.init_state(1)
 
                 # Encode with existing information
-                for obs in info:
-                    if obs[0] == 'Age':
-                        mean, std = self.feature_info[('-1', obs[0])].mean_std_values
-                        info_value = (obs[1] - mean) / std
+                for obs, val in dict_info.items():
+                    if obs == 'Age':
+                        mean, std = self.feature_info[('-1', obs)].mean_std_values
+                        info_value = (val - mean) / std
                     else:
-                        enc_dict = self.feature_info[('-1', obs[0])].encoding_dict
-                        info_value = enc_dict[obs[1]].view(1)
-                    state = self.encoders[obs[0]](state, info_value)
+                        enc_dict = self.feature_info[('-1', obs)].encoding_dict
+                        info_value = enc_dict[val].view(1)
+                    state = self.encoders[obs](state, info_value)
 
                 # Decode for first timestep
                 for target_name in data.unique_features_cont:
@@ -816,7 +816,6 @@ class MoDNModelMIMICDecode(PatientModel):
                         cont_predictions[str(stage), pred_name][0] += se
                         cont_predictions[str(stage), pred_name][1] += 1
                     else:
-                        # TODO: here
                         gt = true_values_cont[(str(preds.index.values[i]), target)]
                         pred_name = target
                         if not math.isnan(gt):

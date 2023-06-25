@@ -2,7 +2,7 @@
 Generative Modular Autoregressive Networks for Medical Time-Series
 
 # Abstract
-Bla bla 
+TODO 
 
 # Installation
 The code runs completely on CPU, therefore there are no CUDA dependencies and the installation is very simple.
@@ -15,6 +15,7 @@ Please use the following command to install the required libraries:
 Entire data should be stored under `modn_data` folder. To generate the toy dataset you can use the functions from
 the `Data_Generation.ipynb` notebook. To generate the MIMIC sub-dataset you can use the `MIMIC_Data_Pipeline.ipynb` notebook,
 after you download the MIMIC-IV dataset by following the steps from [here](https://github.com/healthylaife/MIMIC-IV-Data-Pipeline#Steps-to-download-MIMIC-IV-dataset-for-the-pipeline).
+This notebook is a custom version from [this](https://github.com/healthylaife/MIMIC-IV-Data-Pipeline/blob/main/mainPipeline.ipynb) notebook under [this](https://github.com/healthylaife/MIMIC-IV-Data-Pipeline) repo.
 Otherwise, please ask the previous student responsible for the project.
 
 # Code structure
@@ -85,4 +86,4 @@ python generate.py --model_file <checkpoint_name>.pt
                    --output_path <output_dataframe_name>.csv
 ```
 With the above command a dataframe will be predicted using the given model.
-If you want to generate data with a model, you need to add the `--generate` flag to the above command and TODO.
+If you want to generate data with a model, you need to add the `--generate` flag to the above command. The default data for generation will include all the static variables for each patient.

@@ -5,6 +5,7 @@ from modn_data import DATA_ABS_PATH
 from modn.datasets.mimic import MIMICDataset
 from modn.models.modn import MoDNModelMIMIC
 from modn.models.modn_decode import MoDNModelMIMICDecode
+from modn.datasets.utils import get_default_static_data
 
 
 def get_cli_args(parser):
@@ -48,12 +49,10 @@ def main():
     m.load_model(model_path)
 
     if generate:
-        # TODO: Here read data from a file or other place. Only static features supported as default features!
-        default_info = [[('gender', 'M'), ('label', 'Yes'), ('Age', 30)],
-                        [('gender', 'M'), ('label', 'No'), ('Age', 50)],
-                        [('gender', 'F'), ('label', 'Yes'), ('Age', 80)],
-                        [('gender', 'F'), ('label', 'No'), ('Age', 25)]]
+        # Get default static data from the test set
+        default_info = get_default_static_data(test)
         df = m.generate(test, default_info)
+
     else:
         df, gt_df = m.compare(test)
         gt_df.to_csv('GT_test_data.csv', index=False)
