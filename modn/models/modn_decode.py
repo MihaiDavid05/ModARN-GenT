@@ -620,6 +620,7 @@ class MoDNModelMIMICDecode(PatientModel):
         """Build a dataframe with generated data, based on given information"""
         timesteps = data.timestamps
         df = data._data.data[0:0]
+        gt_df = data._data.features.iloc[data._indices]
 
         # Iterate through all patients with default information
         for i in range(len(default_info)):
@@ -745,7 +746,7 @@ class MoDNModelMIMICDecode(PatientModel):
                     row.append(np.nan)
             df.loc[i] = row
 
-        return df
+        return df, gt_df
 
     def save_and_store(self, wandb_log, model_name):
         if wandb_log:

@@ -51,13 +51,12 @@ def main():
     if generate:
         # Get default static data from the test set
         default_info = get_default_static_data(test)
-        df = m.generate(test, default_info)
-
+        df, gt_df = m.generate(test, default_info)
     else:
         df, gt_df = m.compare(test)
-        gt_df.to_csv('GT_test_data.csv', index=False)
 
     # Save dataframe
+    gt_df.to_csv('GT_' + output_path, index=False)
     df.to_csv(output_path, index=False)
 
 
