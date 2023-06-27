@@ -18,12 +18,12 @@ def plot(stages, results, plots_path, label, ylim):
 
     if label == 'RMSE':
         point_label = 'min'
-        best_idx_score = stages[np.argmin(results)]
-        best_score = np.min(results)
+        best_idx_score = stages[np.nanargmin(results)]
+        best_score = np.nanmin(results)
     else:
         point_label = 'max'
-        best_idx_score = stages[np.argmax(results)]
-        best_score = np.max(results)
+        best_idx_score = stages[np.nanargmax(results)]
+        best_score = np.nanmax(results)
 
     fig, ax = plt.subplots(figsize=(14, 5))
     ax.plot(stages, results)
@@ -45,10 +45,12 @@ def generate_plots(model, plots_path, feature_decoding, reset_state, loss_f1, st
 
     if feature_decoding:
         for f in model.feature_decoders_cont:
-            rmse_res = [results[stage][f"{f}_rmse"] for stage in stages[:-1]]
+            rmse_res = [results[stage][f"{f}_rmse"]
+                        if results[stage].get(f"{f}_rmse") else np.nan for stage in stages[:-1]]
             plots_name = "{}_rmse{}_best{}.pdf".format(f, '_reset_state' if reset_state else '', loss_f1)
             path = os.path.join(plots_path, plots_name)
             plot(stages[:-1], rmse_res, path, 'RMSE', 2)
+
         for f in model.feature_decoders_cat:
             f1_res = [results[stage][f"{f}_f1"] for stage in stages[:-1]]
             plots_name = "{}_f1{}_best{}.pdf".format(f, '_reset_state' if reset_state else '', loss_f1)

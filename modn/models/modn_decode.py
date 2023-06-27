@@ -521,45 +521,52 @@ class MoDNModelMIMICDecode(PatientModel):
 
     def compare(self, data):
         """Build a dataframe from prediction for further comparison with the GT"""
-        def apply_decoders(d, result, agg, ts=0):
+        def apply_decoders(d, result, agg, targets, ts=0):
+
             for target_name in d.target_features:
-                enc_dict = self.feature_info[target_name].encoding_dict
-                res = np.argmax(self.decoders[target_name](state).softmax(1))
-                res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
-                unique_key = target_name[1]
-                result[(str(ts), unique_key)] = res
-                if not agg.get(unique_key, None):
-                    agg[unique_key] = [res]
-                else:
-                    agg[unique_key].append(res)
+                if not math.isnan(targets[('-1', target_name)]):
+                    enc_dict = self.feature_info[target_name].encoding_dict
+                    res = np.argmax(self.decoders[target_name](state).softmax(1))
+                    res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
+                    unique_key = target_name[1]
+                    result[(str(ts), unique_key)] = res
+                    if not agg.get(unique_key, None):
+                        agg[unique_key] = [res]
+                    else:
+                        agg[unique_key].append(res)
 
             for target_name in d.unique_features_cont:
-                if self.use_rmse:
-                    res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0]
-                else:
-                    res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0][0]
-                result[(str(ts), target_name)] = res
-                if target_name == 'Age':
+                time = -1 if target_name == 'Age' else ts
+
+                if not math.isnan(targets[(str(time), target_name)]):
+                    if self.use_rmse:
+                        res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0]
+                    else:
+                        res = self.feature_decoders_cont[target_name](state)[0].detach().numpy()[0][0]
+                    result[(str(ts), target_name)] = res
+                    if target_name == 'Age':
+                        if not agg.get(target_name, None):
+                            agg[target_name] = [res]
+                        else:
+                            agg[target_name].append(res)
+
+            for target_name in d.unique_features_cat:
+                if isinstance(targets[('-1', target_name)], str):
+                    enc_dict = self.feature_info[('-1', target_name)].encoding_dict
+                    res = np.argmax(self.feature_decoders_cat[target_name](state).softmax(1))
+                    res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
+                    result[(str(ts), target_name)] = res
                     if not agg.get(target_name, None):
                         agg[target_name] = [res]
                     else:
                         agg[target_name].append(res)
 
-            for target_name in d.unique_features_cat:
-                enc_dict = self.feature_info[('-1', target_name)].encoding_dict
-                res = np.argmax(self.feature_decoders_cat[target_name](state).softmax(1))
-                res = list(enc_dict.keys())[list(enc_dict.values()).index(res)]
-                result[(str(ts), target_name)] = res
-                if not agg.get(target_name, None):
-                    agg[target_name] = [res]
-                else:
-                    agg[target_name].append(res)
-
             return agg, result
 
         self.feature_info = data.feature_info
         df = data._data.data[0:0]
-        gt_df = data._data.features.iloc[data._indices]
+        # gt_df = data._data.features.iloc[data._indices]
+        gt_df = data._data.data[0:0]
 
         test_data_list = []
         for idx in tqdm(range(len(data))):
@@ -567,16 +574,22 @@ class MoDNModelMIMICDecode(PatientModel):
             test_data_list.append((consultation, targets))
 
         with torch.no_grad():
-            for idx in tqdm(range(len(data))):
+            for idx in tqdm(range(len(test_data_list))):
                 static_agg = {}
                 results = {}
-                consultation, _ = data[idx]
+                consultation, targets = test_data_list[idx]
+
+                for dict_elem in targets:
+                    for item, val in dict_elem.items():
+                        gt_df.loc[idx, item] = val
+
+                available_timesteps = [0]
 
                 # Initialize state for 1 patient
                 state = self.init_state(1)
 
                 # for t = 0 apply decoders on init state
-                static_agg, results = apply_decoders(data, results, static_agg, ts=0)
+                static_agg, results = apply_decoders(data, results, static_agg, gt_df.loc[idx, :], ts=0)
 
                 # for t > 0
                 for (question, answer), nr_obs, timestep in consultation.observations(
@@ -590,7 +603,8 @@ class MoDNModelMIMICDecode(PatientModel):
 
                     # Apply the decoders after encoding entire timeblock
                     if nr_obs == 0:
-                        static_agg, results = apply_decoders(data, results, static_agg, int(timestep) + 1)
+                        available_timesteps.append(int(timestep) + 1)
+                        static_agg, results = apply_decoders(data, results, static_agg, gt_df.loc[idx, :], int(timestep) + 1)
 
                 # Aggregate static variables
                 for key, val in static_agg.items():
@@ -609,8 +623,8 @@ class MoDNModelMIMICDecode(PatientModel):
                 df.loc[idx] = row
 
                 # Build time dependent label
-                for t in range(0, data.timestamps):
-                    df.loc[idx, (str(t), 'label')] = static_agg['label'][t]
+                for i, t in enumerate(available_timesteps):
+                    df.loc[idx, (str(t), 'label')] = static_agg['label'][i]
 
         df = df.sort_index(axis=1)
 
