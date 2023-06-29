@@ -24,7 +24,7 @@ we included this folder here. However, I **recommend you** to separate this fold
 The `MIMIC-IV-Data-Pipeline` directory actually corresponds to a custom version of [this](https://github.com/healthylaife/MIMIC-IV-Data-Pipeline) repo,
 in which several files and the main notebook, `mainPipeline.ipynb`, were modified.
 Therefore, for creating the MIMIC subset you need to do the setup and installation steps and
-download the MIMIC-IV dataset by following the steps in the [repo](https://github.com/healthylaife/MIMIC-IV-Data-Pipeline).
+download the MIMIC-IV dataset by following the steps in the `README.md` under `MIMIC-IV-Data-Pipeline` directory.
 Otherwise, for obtaining the datasets used in experiments, please ask the previous student responsible for the project.
 
 If you want a list of all time dependent features in the dataset (which will be saved in a text file) or all possible values for each static feature in the dataset (which will be printed on the standard output)
