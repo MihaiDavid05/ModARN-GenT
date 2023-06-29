@@ -12,13 +12,23 @@ Please use the following command to install the required libraries:
 ```
 
 # Data
-Entire data should be stored under `modn_data` folder. To generate the toy dataset you can use the functions from
-the `Data_Generation.ipynb` notebook.
+All the `.csv` files related to the data should be stored under `modn_data` folder.
 
-To generate the MIMIC sub-dataset you need to clone [this](https://github.com/healthylaife/MIMIC-IV-Data-Pipeline) repo, do the setup and installation steps, download the MIMIC-IV dataset by following the steps from the same repo and replace their `mainPipeline.ipynb` notebook with the one under `modn/notebooks/MIMIC_Data_Pipeline.ipynb`.
-This notebook is a custom version that also includes the code for the MIMIC subset generation.
-Otherwise, for having the MIMIC subset, please ask the previous student responsible for the project (Mihai David).
+To generate the toy dataset you can use the functions from
+the `Data_Generation.ipynb` notebook under `notebooks` folder.
 
+To generate the MIMIC subset you can use the `mainPipeline.ipynb` notebook under `MIMIC-IV-Data-Pipeline` folder. 
+
+**IMPORTANT NOTE**: The `MIMIC-IV-Data-Pipeline` folder was not part of this repo in the beginning, as it has its own requirements and setup, but for the purpose of keeping all the necessary files under the same repo,
+we included this folder here. However, I **recommend you** to separate this folder from the rest of the project tree.
+The `MIMIC-IV-Data-Pipeline` directory actually corresponds to a custom version of [this](https://github.com/healthylaife/MIMIC-IV-Data-Pipeline) repo,
+in which several files and the main notebook, `mainPipeline.ipynb`, were modified.
+Therefore, for creating the MIMIC subset you need to do the setup and installation steps and
+download the MIMIC-IV dataset by following the steps in the [repo](https://github.com/healthylaife/MIMIC-IV-Data-Pipeline).
+Otherwise, for obtaining the datasets used in experiments, please ask the previous student responsible for the project.
+
+If you want a list of all time dependent features in the dataset (which will be saved in a text file) or all possible values for each static feature in the dataset (which will be printed on the standard output)
+you can run the `data_inspect.py` script under `scripts` folder. This script also has an optional flag for cleaning possible abnormal rows.
 # Code structure
 ```
 .
@@ -32,13 +42,16 @@ Otherwise, for having the MIMIC subset, please ask the previous student responsi
 │   │   ├─── modules.py
 │   │   └─── utils.py
 │   ├───notebooks
-│   │   ├─── MIMIC_Data_Pipeline.ipynb                   
-│   │   └─── Data_Generation.ipynb
+│   │   └─── Data_Generation.ipynb ---> notebook for generating the toy dataset and other functionalities
 │   └───scripts                    ---> helpers
 │       ├─── data_inspect.py
 │       ├─── explore_patient.py
 │       └─── evaluation_utils.py
 ├───modn_data                      ---> data folder
+│   ├─── MIMIC-IV-Data-Pipeline    ---> data pipeline for creating MIMIC subset folder
+│   │    ├─── mainPipeline.ipynb   ---> main notebook for creating the MIMIC subset
+│   │    └─── ......
+│   └───  <all_CSV_files>.csv
 ├───plots                          ---> plots folder
 ├───saved models                   ---> models folder
 ├───requirements.txt                
@@ -84,7 +97,7 @@ Plots with metrics will be created under the `plots` folder.
 Use the `generate_compare.py` script to either predict or generate data under a dataframe format.
 
 ```bash
-python generate.py --model_file <checkpoint_name>.pt
+python generate_compare.py --model_file <checkpoint_name>.pt
                    --output_path <output_dataframe_name>.csv
 ```
 With the above command a dataframe will be predicted using the given model.

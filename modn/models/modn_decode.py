@@ -565,8 +565,8 @@ class MoDNModelMIMICDecode(PatientModel):
 
         self.feature_info = data.feature_info
         df = data._data.data[0:0]
-        # gt_df = data._data.features.iloc[data._indices]
-        gt_df = data._data.data[0:0]
+        gt_df = data._data.features.iloc[data._indices].reset_index()
+        # gt_df = data._data.data[0:0]
 
         test_data_list = []
         for idx in tqdm(range(len(data))):
@@ -579,9 +579,9 @@ class MoDNModelMIMICDecode(PatientModel):
                 results = {}
                 consultation, targets = test_data_list[idx]
 
-                for dict_elem in targets:
-                    for item, val in dict_elem.items():
-                        gt_df.loc[idx, item] = val
+                # for dict_elem in targets:
+                #     for item, val in dict_elem.items():
+                #         gt_df.loc[idx, item] = val
 
                 available_timesteps = [0]
 

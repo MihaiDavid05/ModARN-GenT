@@ -8,8 +8,6 @@ import argparse
 
 def get_cli_args(parser):
     parser.add_argument('--dataset_type', type=str, required=True, help='Dataset type: small or toy')
-    parser.add_argument('--reset_state', action='store_true',
-                        help='Whether to reset state at each timestep at validation time')
     parser.add_argument('--clean_rows', action='store_true',
                         help='Clean possible abnormal rows that are full of zeros or not')
     parser.add_argument('--output_columns', action='store_true',
@@ -25,7 +23,6 @@ if __name__ == "__main__":
 
     args = get_cli_args(argparse.ArgumentParser())
     dataset_type = args.dataset_type
-    reset_state = args.reset_state
     clean_rows = args.clean_rows
     output_columns = args.output_columns
     output_unique_static = args.output_unique_static
