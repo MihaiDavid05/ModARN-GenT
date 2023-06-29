@@ -651,13 +651,14 @@ class MoDNModelMIMICDecode(PatientModel):
 
                 # Encode with existing information
                 for obs, val in dict_info.items():
-                    if obs == 'Age':
-                        mean, std = self.feature_info[('-1', obs)].mean_std_values
-                        info_value = (val - mean) / std
-                    else:
-                        enc_dict = self.feature_info[('-1', obs)].encoding_dict
-                        info_value = enc_dict[val].view(1)
-                    state = self.encoders[obs](state, info_value)
+                    if isinstance(val, float) and not math.isnan(val):
+                        if obs == 'Age':
+                            mean, std = self.feature_info[('-1', obs)].mean_std_values
+                            info_value = (val - mean) / std
+                        else:
+                            enc_dict = self.feature_info[('-1', obs)].encoding_dict
+                            info_value = enc_dict[val].view(1)
+                        state = self.encoders[obs](state, info_value)
 
                 # Decode for first timestep
                 for target_name in data.unique_features_cont:
@@ -702,7 +703,9 @@ class MoDNModelMIMICDecode(PatientModel):
                 for t in range(2, timesteps):
                     # Encode already generated values
                     for target_name in data.unique_features_cont + data.unique_features_cat:
-                        state = self.encoders[target_name](state, results[(str(t - 1), target_name)])
+                        new_val = results[(str(t - 1), target_name)]
+                        if isinstance(new_val, float) and not math.isnan(new_val):
+                            state = self.encoders[target_name](state, new_val)
 
                     # Decode again
                     for target_name in data.unique_features_cont:
