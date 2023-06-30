@@ -133,8 +133,8 @@ def main():
         lr_decoders = 1e-2
         gradient_clipping = 1
         nr_epochs = 150
-        state_size = 30
-        patience = 30
+        state_size = 60
+        patience = 50
         learning_rate_decay_factor = 0.9
 
         model_name = "Exp_{}_MaxEpochs_{}_{}{}".format(exp_id, nr_epochs, dataset_type,

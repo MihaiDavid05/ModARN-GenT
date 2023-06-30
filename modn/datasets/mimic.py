@@ -13,24 +13,6 @@ from modn.datasets import DataPointMIMIC, ConsultationMIMIC, ObservationMIMIC, F
 
 class MIMICDataset(PatientDataset):
 
-    # Define toy dataset features
-    feature_toy_static = ['Age', 'gender', 'insurance', 'label']
-    feature_toy = ['F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide'] + feature_toy_static
-    # target_toy = ["label"]
-    target_toy = []
-    feature_toy_cont = ['Age', 'F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide']
-    feature_toy_cat = ['gender', 'insurance', 'label']
-
-    # Define small dataset features
-    feature_small_static = ['Age', 'gender', 'ethnicity', 'insurance', 'label']
-    feature_small = ['WBC', 'Chloride (serum)', 'Glucose (serum)', 'Magnesium', 'Sodium (serum)', 'BUN', 'Phosphorous',
-                     'Anion gap', 'Potassium (serum)', 'HCO3 (serum)', 'Platelet Count', 'Prothrombin time', 'PTT',
-                     'Lactic Acid'] + feature_small_static
-    # target_small = ["label"]
-    target_small = []
-    feature_small_cat = ['ethnicity', 'gender', 'insurance', 'label']
-    feature_small_cont = feature_small[:15]
-
     def __init__(
             self,
             csv_file: str,
@@ -40,11 +22,39 @@ class MIMICDataset(PatientDataset):
             use_feats_decoders: bool = False,
             normalise: bool = True
     ):
+        self.use_feats_decoders = use_feats_decoders
+
+        # Define toy dataset and small MIMIC categorical and static features
+        self.feature_toy_static = ['Age', 'gender', 'insurance']
+        self.feature_toy_cat = ['gender', 'insurance']
+        self.target_toy = ["label"]
+
+        self.feature_small_static = ['Age', 'gender', 'ethnicity', 'insurance']
+        self.feature_small_cat = ['ethnicity', 'gender', 'insurance']
+        self.target_small = ["label"]
+
+        if self.use_feats_decoders:
+            self.feature_toy_static.append('label')
+            self.feature_toy_cat.append('label')
+            self.target_toy = []
+
+            self.feature_small_static.append('label')
+            self.feature_small_cat.append('label')
+            self.target_small = []
+
+        # Define toy dataset and small MIMIC continuous features
+        self.feature_toy = ['F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide'] + self.feature_toy_static
+        self.feature_toy_cont = ['Age', 'F1_constant', 'F2_early', 'F3_late', 'F4_narrow', 'F5_wide']
+
+        self.feature_small = ['WBC', 'Chloride (serum)', 'Glucose (serum)', 'Magnesium', 'Sodium (serum)', 'BUN',
+                              'Phosphorous', 'Anion gap', 'Potassium (serum)', 'HCO3 (serum)', 'Platelet Count',
+                              'Prothrombin time', 'PTT', 'Lactic Acid'] + self.feature_small_static
+        self.feature_small_cont = self.feature_small[:15]
+
         self.global_question_block = global_question_block
         self.data = self._load_data(csv_file)
         self.data_type = data_type
         self._metadata = None
-        self.use_feats_decoders = use_feats_decoders
         self.timestamps = len(self.data.columns.levels[0]) - 1
         self.nr_static_feats = len(getattr(self, 'feature_{}_static'.format(self.data_type)))
         self.normalise = normalise
@@ -58,18 +68,12 @@ class MIMICDataset(PatientDataset):
             self.features_cat = self.data[self.feature_features_cat]
         else:
             self.feature_features_cat, self.feature_features_cont = [], []
-            self.feature_features, self.target_features,\
-                _, _ = self.get_feature_names(use_feat_decoders=self.use_feats_decoders)
+            self.feature_features, self.target_features, \
+            _, _ = self.get_feature_names(use_feat_decoders=self.use_feats_decoders)
             self.features = self.data[self.feature_features]
             self.targets = self.data[self.target_features]
             self.features_cont, self.features_cat = pd.DataFrame(), pd.DataFrame()
 
-        print("Initial number of features: {}".format(len(self.feature_features)))
-        if remove_correlated_features:
-            self.feature_features = self._remove_correlated_features(
-                self.feature_features
-            )
-        print("Features after correlation removal: {}".format(len(self.feature_features)))
         self.feature_info = self._init_feature_info(self.data)
 
         if self.use_feats_decoders:
