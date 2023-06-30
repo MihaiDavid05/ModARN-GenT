@@ -1,7 +1,7 @@
 # :hospital: ModARN-GenT
 Generative Modular Autoregressive Networks for Medical Time-Series
 
-# Abstract
+# :bookmark_tabs: Abstract
 *BACKGROUND.* In medicine, patients are frequently observed over fine-grained time frames, and
 variations in repeated measures are crucial to determining how well the patient is responding to
 therapy. However, it might be difficult to gather and manage granular time series data representing a
@@ -29,14 +29,14 @@ the modularization allows the model to learn from a flexible number and combinat
 without being biased by the systematic missingness, we conclude that the amount of missing data has
 a negative impact on the overall learning performance.
 
-# Installation
+# :gear: Installation
 The code runs completely on CPU, therefore there are no CUDA dependencies and the installation is very simple.
 Please use the following command to install the required libraries:
 ```bash
  pip install -r requirements.txt
 ```
 
-# Data
+# :books: Data
 All the `.csv` files related to the data should be stored under `modn_data` folder.
 
 To generate the toy dataset you can use the functions from
@@ -54,7 +54,7 @@ Otherwise, for obtaining the MIMIC subset used in experiments, please ask the pr
 
 If you want a list of all time dependent features in the dataset (which will be saved in a text file) or all possible values for each static feature in the dataset (which will be printed in the standard output)
 you can run the `data_inspect.py` script under `scripts` folder. This script also has an optional flag for cleaning possible abnormal rows.
-# Code structure
+# :deciduous_tree: Code structure
 ```
 .
 ├───modn
@@ -85,7 +85,7 @@ you can run the `data_inspect.py` script under `scripts` folder. This script als
 └───train.py                       ---> training
 ```
 
-# Usage
+# :computer: Usage
 
 ### Training
 Use the `train.py` script for training. We provide CLI options that are further explained in the training script.
