@@ -28,7 +28,7 @@ def plot(stages, results, plots_path, label, ylim):
     fig, ax = plt.subplots(figsize=(14, 5))
     ax.plot(stages, results)
     ax.plot(best_idx_score, best_score, 'o',
-            label='{}: {}, timestep: {}'.format(point_label, best_score, best_idx_score),
+            label='{}: {:.2f}, timestep: {}'.format(point_label, best_score, best_idx_score),
             markersize=3, color='orange')
     point = mlines.Line2D([], [], color='orange', marker='o', linestyle='None', markersize=5, label=point_label)
     ax.legend(handles=[point])
@@ -55,11 +55,10 @@ def generate_plots(model, plots_path, feature_decoding, reset_state, loss_f1, st
             f1_res = [results[stage][f"{f}_f1"] for stage in stages[:-1]]
             plots_name = "{}_f1{}_best{}.pdf".format(f, '_reset_state' if reset_state else '', loss_f1)
             path = os.path.join(plots_path, plots_name)
-            plot(stages[:-1], f1_res, path, 'Macro F1', 1)
+            plot(stages[:-1], f1_res, path, 'Macro F1', 1.1)
 
     for f in model.decoders:
-        f = f[1]
         f1_res = [results[stage][f"{f}_f1"] for stage in stages]
         plots_name = "{}_f1{}_best{}.pdf".format(f, '_reset_state' if reset_state else '', loss_f1)
         path = os.path.join(plots_path, plots_name)
-        plot(stages, f1_res, path, 'Macro F1', 1)
+        plot(stages, f1_res, path, 'Macro F1', 1.1)
