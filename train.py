@@ -132,7 +132,7 @@ def main():
         lr_encoders = 1e-2
         lr_decoders = 1e-2
         gradient_clipping = 1
-        nr_epochs = 150
+        nr_epochs = 250
         state_size = 60
         patience = 50
         learning_rate_decay_factor = 0.9
